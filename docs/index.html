@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="oscuro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1020">
+  <meta name="description" content="Lee libros técnicos en inglés con traducción y explicaciones en español.">
+  <title>TechReader AI</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="iconos/icono.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="iconos/icono-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="estilos.css?v=1">
+</head>
+<body>
+
+<!-- ═══════════ Iconos (se reutilizan con <use href="#i-nombre">) ═══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-libro" viewBox="0 0 24 24"><path d="M2 5c3-1.5 6.5-1.5 9.5.5V21c-3-2-6.5-2-9.5-.5zM22 5c-3-1.5-6.5-1.5-9.5.5V21c3-2 6.5-2 9.5-.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-lector" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-lapiz" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-lista" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-check-circulo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M8 12.5l2.7 2.7L16 9.8"/></symbol>
+  <symbol id="i-engranaje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-carpeta" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-abajo" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-izq" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-der" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-menos" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-ajustar" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-indice" viewBox="0 0 24 24"><path d="M4 6h10M4 12h16M4 18h12"/></symbol>
+  <symbol id="i-rotar" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/></symbol>
+  <symbol id="i-descargar" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-subir" viewBox="0 0 24 24"><path d="M12 16V5M7 10l5-5 5 5M4 20h16"/></symbol>
+  <symbol id="i-imprimir" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><path d="M7 14h10v7H7z"/></symbol>
+  <symbol id="i-pantalla" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></symbol>
+  <symbol id="i-chispa" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-cuaderno" viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6zM6 3v18M3 7h3M3 12h3M3 17h3M10 8h6M10 12h4"/></symbol>
+  <symbol id="i-traducir" viewBox="0 0 24 24"><path d="M4 5h8M8 3v2M5.5 5c1 3.5 3.5 6 6.5 7.5M10.5 5c-.8 3-3 6.2-6.5 8M13 21l4-9 4 9M14.5 18h5"/></symbol>
+  <symbol id="i-bombilla" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-documento" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M8.5 13h7M8.5 17h5"/></symbol>
+  <symbol id="i-codigo" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+  <symbol id="i-marcador" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4.5L6 21z"/></symbol>
+  <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-papelera" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#0b1220" stroke-width="2.4"/></symbol>
+  <symbol id="i-esquema" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="6" rx="1"/><rect x="14" y="15" width="7" height="6" rx="1"/><rect x="14" y="3" width="7" height="6" rx="1"/><path d="M6.5 9v5a1 1 0 0 0 1 1H14M10 6h4"/></symbol>
+  <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M5 20V10M10 20V4M15 20v-7M20 20V8" stroke-width="3"/></symbol>
+  <symbol id="i-letra" viewBox="0 0 24 24"><path d="M4 19l5-14 5 14M6 14h6M15 19l3-8 3 8M16 16.5h4"/></symbol>
+</svg>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-llave" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></symbol>
+  <symbol id="i-candado" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-instalar" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v7M9 11l3 3 3-3M10 18h4"/></symbol>
+  <symbol id="i-salir" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ═══════════ Fila 1: marca + navegación principal ═══════════ -->
+  <header class="cabecera">
+    <div class="marca">
+      <svg class="marca-icono"><use href="#i-libro"/></svg>
+      <span class="marca-nombre">TechReader <b>AI</b></span>
+      <span class="marca-lema">Tu asistente para aprender programación en español</span>
+    </div>
+
+    <nav class="nav-principal" aria-label="Secciones">
+      <button class="nav-item activo" data-vista="lector"><svg><use href="#i-lector"/></svg>Lector</button>
+      <button class="nav-item" data-vista="notas"><svg><use href="#i-lapiz"/></svg>Mis Notas</button>
+      <button class="nav-item" data-vista="glosario"><svg><use href="#i-lista"/></svg>Glosario</button>
+      <button class="nav-item" data-vista="cuestionarios"><svg><use href="#i-check-circulo"/></svg>Cuestionarios</button>
+    </nav>
+
+    <div class="cabecera-derecha">
+      <button id="btn-instalar" class="boton-icono grande" title="Instalar como app" aria-label="Instalar como app" hidden><svg><use href="#i-instalar"/></svg></button>
+      <button id="btn-ajustes" class="boton-icono grande" title="Ajustes" aria-label="Ajustes"><svg><use href="#i-engranaje"/></svg></button>
+      <button id="avatar" class="avatar" title="Ajustes">F</button>
+    </div>
+  </header>
+
+  <!-- ═══════════ Vista: LECTOR ═══════════ -->
+  <section id="vista-lector" class="vista">
+    <div class="barra-herramientas">
+      <div class="selector-libro" id="selector-libro">
+        <button id="btn-libro" class="campo boton-libro" aria-haspopup="listbox" aria-expanded="false">
+          <svg class="icono-carpeta"><use href="#i-carpeta"/></svg>
+          <span id="titulo-libro" class="titulo-libro">Elige un libro…</span>
+          <svg class="flecha"><use href="#i-abajo"/></svg>
+        </button>
+        <div id="menu-libros" class="menu menu-libros" role="listbox" hidden>
+          <div class="menu-titulo">Tus libros en este dispositivo</div>
+          <div id="lista-libros"></div>
+          <button id="btn-agregar" class="menu-agregar">
+            <svg><use href="#i-subir"/></svg>
+            <span><b>Agregar PDF…</b><small>Se guarda solo en este dispositivo</small></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="navegacion campo">
+        <button id="anterior" class="boton-icono" title="Página anterior (←)" aria-label="Página anterior"><svg><use href="#i-izq"/></svg></button>
+        <input id="numero" type="number" inputmode="numeric" min="1" value="1" aria-label="Número de página">
+        <span class="de-total">/ <span id="total">–</span></span>
+        <button id="siguiente" class="boton-icono" title="Página siguiente (→)" aria-label="Página siguiente"><svg><use href="#i-der"/></svg></button>
+      </div>
+
+      <div class="buscador" id="buscador">
+        <button id="btn-buscar-movil" class="boton-icono solo-movil" aria-label="Buscar en el libro"><svg><use href="#i-buscar"/></svg></button>
+        <label class="campo campo-busqueda">
+          <svg><use href="#i-buscar"/></svg>
+          <input id="busqueda" type="search" placeholder="Buscar en el libro…" autocomplete="off">
+        </label>
+        <div id="resultados" class="menu menu-resultados" hidden></div>
+      </div>
+    </div>
+
+    <div id="area" class="area" data-panel-movil="pdf">
+      <!-- Tarjeta izquierda: el PDF -->
+      <section id="tarjeta-pdf" class="tarjeta tarjeta-pdf" aria-label="Libro">
+        <div class="barra-pdf">
+          <div class="grupo-botones">
+            <button id="zoom-menos" class="boton-icono" title="Alejar" aria-label="Alejar"><svg><use href="#i-menos"/></svg></button>
+            <span id="zoom-valor" class="zoom-valor">100%</span>
+            <button id="zoom-mas" class="boton-icono" title="Acercar" aria-label="Acercar"><svg><use href="#i-mas"/></svg></button>
+          </div>
+          <span class="separador"></span>
+          <button id="btn-ajustar" class="boton-icono" title="Ajustar al ancho"><svg><use href="#i-ajustar"/></svg></button>
+          <div class="ancla-menu">
+            <button id="btn-indice" class="boton-icono" title="Índice del libro"><svg><use href="#i-indice"/></svg></button>
+            <div id="menu-indice" class="menu menu-indice" hidden></div>
+          </div>
+          <button id="btn-rotar" class="boton-icono" title="Rotar página"><svg><use href="#i-rotar"/></svg></button>
+          <button id="btn-pantalla" class="boton-icono solo-escritorio" title="Pantalla completa"><svg><use href="#i-pantalla"/></svg></button>
+        </div>
+
+        <div id="pdf-scroll" class="pdf-scroll">
+          <div id="pagina" class="pagina">
+            <canvas id="lienzo"></canvas>
+            <div id="capa-texto" class="textLayer"></div>
+          </div>
+          <div id="sin-pdf" class="vacio" hidden>
+            <div class="vacio-ilustracion"><svg><use href="#i-subir"/></svg></div>
+            <h3>Falta el PDF en este dispositivo</h3>
+            <p>Tus notas y traducciones de este libro ya están aquí (vinieron en el respaldo). Agrega el mismo PDF para seguir leyendo.</p>
+            <button id="btn-agregar-faltante" class="boton-primario"><svg><use href="#i-subir"/></svg><span>Elegir el PDF</span></button>
+          </div>
+        </div>
+
+        <div class="pie-pdf">
+          <input id="deslizador" type="range" min="1" max="1" value="1" aria-label="Ir a la página">
+          <div class="pie-textos"><span>Página <b id="pie-pagina">1</b></span><span>de <span id="pie-total">–</span></span></div>
+        </div>
+      </section>
+
+      <div id="divisor" class="divisor" role="separator" aria-orientation="vertical" title="Arrastra para cambiar el tamaño"></div>
+
+      <!-- Tarjeta derecha: asistente, traducción de página y apuntes -->
+      <section class="tarjeta tarjeta-asistente" aria-label="Asistente">
+        <div class="pestanas" role="tablist">
+          <button class="pestana activa" data-pestana="asistente" role="tab"><svg><use href="#i-chispa"/></svg><span>Asistente IA</span></button>
+          <button class="pestana" data-pestana="pagina" role="tab"><svg><use href="#i-globo"/></svg><span>Traducir página</span></button>
+          <button class="pestana" data-pestana="apuntes" role="tab"><svg><use href="#i-cuaderno"/></svg><span>Apuntes</span> <span id="contador-apuntes" class="contador"></span></button>
+          <div class="tamano-letra" title="Tamaño de letra">
+            <button id="letra-menos" class="boton-icono" aria-label="Letra más pequeña">A<small>−</small></button>
+            <button id="letra-mas" class="boton-icono" aria-label="Letra más grande">A<small>+</small></button>
+          </div>
+        </div>
+
+        <div id="panel-asistente" class="panel-contenido">
+          <div id="asistente-vacio" class="vacio">
+            <div class="vacio-ilustracion"><svg><use href="#i-chispa"/></svg></div>
+            <h3>Selecciona texto en el libro</h3>
+            <p class="solo-escritorio">Arrastra el mouse sobre una frase, un párrafo o un código. Aparecerá una barra con:</p>
+            <p class="solo-movil">Mantén presionada una palabra y arrastra para seleccionar. Abajo aparecerá una barra con:</p>
+            <div class="vacio-acciones">
+              <span><svg><use href="#i-traducir"/></svg>Traducir</span>
+              <span><svg><use href="#i-bombilla"/></svg>Explicar</span>
+              <span><svg><use href="#i-documento"/></svg>Resumir</span>
+              <span><svg><use href="#i-codigo"/></svg>Ejemplo</span>
+              <span><svg><use href="#i-marcador"/></svg>Guardar</span>
+            </div>
+          </div>
+          <div id="asistente-contenido" hidden>
+            <details id="fragmento" class="fragmento">
+              <summary><span class="etiqueta">Fragmento seleccionado · pág. <span id="fragmento-pagina"></span></span></summary>
+              <p id="fragmento-texto"></p>
+            </details>
+            <div id="tarjetas"></div>
+            <div id="mas-acciones" class="mas-acciones"></div>
+          </div>
+        </div>
+
+        <div id="panel-pagina" class="panel-contenido" hidden>
+          <div class="acciones-pagina">
+            <div class="segmentado" role="radiogroup" aria-label="Modo de traducción">
+              <button id="modo-texto" role="radio" aria-checked="true" title="Más rápido y gasta menos cuota">Solo texto</button>
+              <button id="modo-imagen" role="radio" aria-checked="false" title="Gemini ve la página: ideal con diagramas">Texto + imagen</button>
+            </div>
+            <button id="btn-traducir" class="boton-primario"><svg><use href="#i-traducir"/></svg><span>Traducir página</span></button>
+          </div>
+          <div id="estado-pagina" class="estado-pagina"></div>
+          <div id="aviso" class="aviso" hidden></div>
+          <article id="traduccion" class="prosa"></article>
+          <details class="depurar">
+            <summary>🔍 Ver el texto que extrajo el lector</summary>
+            <pre id="texto-extraido"></pre>
+          </details>
+        </div>
+
+        <div id="panel-apuntes" class="panel-contenido" hidden>
+          <div id="lista-apuntes" class="lista-notas"></div>
+        </div>
+
+        <div class="progreso">
+          <svg class="progreso-icono"><use href="#i-grafico"/></svg>
+          <div class="progreso-info">
+            <div class="progreso-titulo">Tu progreso</div>
+            <div id="progreso-detalle" class="progreso-detalle">—</div>
+            <div class="progreso-barra"><div id="progreso-relleno"></div></div>
+          </div>
+          <div id="progreso-porcentaje" class="progreso-porcentaje">0%</div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ═══════════ Vista: MIS NOTAS ═══════════ -->
+  <section id="vista-notas" class="vista vista-pagina" hidden>
+    <div class="contenedor">
+      <div class="vista-cabecera">
+        <div>
+          <h1>Mis Notas</h1>
+          <p>Todo lo que guardaste con <b>Guardar</b> mientras leías.</p>
+        </div>
+        <div class="vista-filtros">
+          <label class="campo campo-busqueda"><svg><use href="#i-buscar"/></svg><input id="filtro-notas" type="search" placeholder="Filtrar notas…"></label>
+          <select id="filtro-libro" class="campo"></select>
+        </div>
+      </div>
+      <div id="todas-notas" class="lista-notas cuadricula"></div>
+    </div>
+  </section>
+
+  <section id="vista-glosario" class="vista vista-pagina" hidden>
+    <div class="contenedor proximamente">
+      <div class="vacio-ilustracion grande"><svg><use href="#i-lista"/></svg></div>
+      <h1>Glosario</h1>
+      <p>Aquí se juntarán automáticamente los términos técnicos que traduces (los del 📌 Vocabulario), con su traducción y una explicación corta.</p>
+      <span class="insignia">Próximo sprint</span>
+    </div>
+  </section>
+  <section id="vista-cuestionarios" class="vista vista-pagina" hidden>
+    <div class="contenedor proximamente">
+      <div class="vacio-ilustracion grande"><svg><use href="#i-check-circulo"/></svg></div>
+      <h1>Cuestionarios</h1>
+      <p>Preguntas y tarjetas de repaso generadas a partir de tus notas, para que recuerdes lo que leíste.</p>
+      <span class="insignia">Próximo sprint</span>
+    </div>
+  </section>
+
+  <!-- Barra inferior (solo celular) -->
+  <nav class="barra-movil" aria-label="Navegación">
+    <button data-movil="pdf" class="activo"><svg><use href="#i-lector"/></svg>Libro</button>
+    <button data-movil="asistente"><svg><use href="#i-chispa"/></svg>Asistente</button>
+    <button data-movil="notas"><svg><use href="#i-lapiz"/></svg>Mis notas</button>
+  </nav>
+</div>
+
+<!-- ═══════════ Bienvenida / configuración inicial ═══════════ -->
+<section id="bienvenida" class="pantalla-completa" hidden>
+  <div class="bienvenida-caja">
+    <div class="vacio-ilustracion grande"><svg><use href="#i-libro"/></svg></div>
+    <h1>Bienvenido a TechReader AI</h1>
+    <p>Todo se guarda <b>solo en este dispositivo</b>: tus libros, notas y tu clave nunca se suben a internet.</p>
+
+    <ol class="pasos">
+      <li id="paso-clave">
+        <div class="paso-titulo"><svg><use href="#i-llave"/></svg><b>1. Tu clave de Gemini</b> <span id="paso-clave-estado" class="paso-estado"></span></div>
+        <p>Sácala gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> y pégala aquí.</p>
+        <div class="fila">
+          <input id="bienvenida-clave" class="campo" type="password" placeholder="AIza…" autocomplete="off">
+          <button id="bienvenida-probar" class="boton-primario">Guardar</button>
+        </div>
+      </li>
+      <li>
+        <div class="paso-titulo"><svg><use href="#i-subir"/></svg><b>2. Agrega un libro PDF</b></div>
+        <p>Se guarda dentro del navegador. En cada dispositivo lo agregas una vez.</p>
+        <button id="bienvenida-pdf" class="boton-primario secundario"><svg><use href="#i-subir"/></svg><span>Elegir un PDF</span></button>
+      </li>
+      <li>
+        <div class="paso-titulo"><svg><use href="#i-descargar"/></svg><b>¿Ya usabas TechReader en otro dispositivo?</b></div>
+        <p>Importa tu respaldo: trae tus notas, traducciones, progreso y (si la guardaste) tu clave.</p>
+        <button id="bienvenida-importar" class="boton-primario secundario"><svg><use href="#i-descargar"/></svg><span>Importar respaldo</span></button>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═══════════ Bloqueo con PIN ═══════════ -->
+<section id="bloqueo" class="pantalla-completa" hidden>
+  <form id="form-pin" class="bienvenida-caja bloqueo-caja">
+    <div class="vacio-ilustracion grande"><svg><use href="#i-candado"/></svg></div>
+    <h1>TechReader AI</h1>
+    <p>Escribe tu PIN para entrar.</p>
+    <input id="pin-entrada" class="campo pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="PIN">
+    <button class="boton-primario" type="submit">Entrar</button>
+    <button id="pin-olvide" class="enlace" type="button">Olvidé mi PIN</button>
+  </form>
+</section>
+
+<!-- Barra de acciones que aparece al seleccionar texto -->
+<div id="barra-seleccion" class="barra-seleccion" hidden>
+  <button data-accion="traducir"><svg><use href="#i-traducir"/></svg>Traducir</button>
+  <button data-accion="explicar"><svg><use href="#i-bombilla"/></svg>Explicar</button>
+  <button data-accion="resumir"><svg><use href="#i-documento"/></svg>Resumir</button>
+  <button data-accion="ejemplo"><svg><use href="#i-codigo"/></svg>Ejemplo</button>
+  <button data-accion="guardar"><svg><use href="#i-marcador"/></svg>Guardar</button>
+</div>
+
+<!-- ═══════════ Ajustes ═══════════ -->
+<div id="ajustes" class="modal-fondo" hidden>
+  <div class="modal" role="dialog" aria-labelledby="ajustes-titulo">
+    <div class="modal-cabecera">
+      <h2 id="ajustes-titulo">Ajustes</h2>
+      <button id="ajustes-cerrar" class="boton-icono" aria-label="Cerrar"><svg><use href="#i-cerrar"/></svg></button>
+    </div>
+    <div class="modal-cuerpo">
+      <h3>Gemini (inteligencia artificial)</h3>
+      <div class="ajuste">
+        <span>Tu clave de API <b id="estado-clave"></b></span>
+        <div class="fila">
+          <input id="ajuste-clave" class="campo" type="password" placeholder="AIza…" autocomplete="off">
+          <button id="probar-clave" class="boton-primario">Probar y guardar</button>
+        </div>
+        <small class="ayuda">Gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Se guarda solo en este navegador.</small>
+      </div>
+      <div class="ajuste">
+        <span>Modelos (en orden de uso)</span>
+        <input id="ajuste-modelos" class="campo" type="text" spellcheck="false">
+        <small class="ayuda">Se eligen solos al probar la clave. Si uno se queda sin cuota, se usa el siguiente.</small>
+      </div>
+
+      <h3>Apariencia</h3>
+      <div class="ajuste">
+        <span>Tema</span>
+        <div class="segmentado" id="tema">
+          <button data-valor="oscuro">Oscuro</button>
+          <button data-valor="sepia">Sepia</button>
+          <button data-valor="claro">Claro</button>
+        </div>
+      </div>
+      <div class="ajuste">
+        <span>Tamaño de letra <b id="ajuste-letra-valor"></b></span>
+        <input id="ajuste-letra" type="range" min="14" max="30" step="1">
+      </div>
+      <div class="ajuste">
+        <span>Interlineado <b id="ajuste-interlineado-valor"></b></span>
+        <input id="ajuste-interlineado" type="range" min="1.4" max="2.2" step="0.1">
+      </div>
+      <div class="ajuste">
+        <span>Tipo de letra</span>
+        <div class="segmentado" id="fuente">
+          <button data-valor="sans">Sans (moderna)</button>
+          <button data-valor="serif">Serif (libro)</button>
+        </div>
+      </div>
+      <label class="interruptor"><input id="pdf-oscuro" type="checkbox"><span>Oscurecer la página del PDF (lectura nocturna)</span></label>
+      <label class="interruptor"><input id="auto" type="checkbox"><span>Traducir la página automáticamente al cambiar de página</span></label>
+      <div class="ajuste">
+        <span>Tu nombre (para el avatar)</span>
+        <input id="ajuste-nombre" class="campo" type="text" maxlength="30">
+      </div>
+
+      <h3>Tus datos</h3>
+      <p class="ayuda">Todo vive en este navegador. Haz un respaldo de vez en cuando y úsalo para pasar tu avance a otro dispositivo. <span id="espacio-usado"></span></p>
+      <label class="interruptor"><input id="respaldo-con-clave" type="checkbox"><span>Incluir mi clave de Gemini en el respaldo (cifrada con una contraseña)</span></label>
+      <div class="fila botones">
+        <button id="btn-exportar" class="boton-primario"><svg><use href="#i-descargar"/></svg><span>Descargar respaldo</span></button>
+        <button id="btn-importar" class="boton-primario secundario"><svg><use href="#i-subir"/></svg><span>Importar respaldo</span></button>
+      </div>
+
+      <h3>Seguridad</h3>
+      <div class="ajuste">
+        <span>PIN para abrir la app <b id="estado-pin"></b></span>
+        <div class="fila">
+          <input id="ajuste-pin" class="campo" type="password" inputmode="numeric" placeholder="Nuevo PIN (4 a 12 dígitos)" maxlength="12" autocomplete="new-password">
+          <button id="guardar-pin" class="boton-primario secundario">Guardar PIN</button>
+          <button id="quitar-pin" class="boton-primario secundario">Quitar</button>
+        </div>
+        <small class="ayuda">Útil en la PC del trabajo. Es una protección básica, no un cifrado.</small>
+      </div>
+      <button id="btn-salir" class="boton-peligro"><svg><use href="#i-salir"/></svg><span>Salir de este dispositivo (borrar todo)</span></button>
+
+      <h3>Atajos de teclado</h3>
+      <div class="atajos">
+        <p><kbd>←</kbd> <kbd>→</kbd><span>cambiar de página</span></p>
+        <p><kbd>T</kbd><span>traducir la selección (o la página si no hay selección)</span></p>
+        <p><kbd>E</kbd><span>explicar la selección</span></p>
+        <p><kbd>+</kbd> <kbd>−</kbd><span>tamaño de letra</span></p>
+        <p><kbd>Ctrl</kbd> <kbd>F</kbd><span>buscar en el libro</span></p>
+        <p><kbd>Esc</kbd><span>cerrar menús</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ventana para pedir una contraseña (respaldo cifrado) -->
+<div id="dialogo" class="modal-fondo" hidden>
+  <form id="dialogo-form" class="modal modal-chico">
+    <div class="modal-cabecera"><h2 id="dialogo-titulo"></h2></div>
+    <div class="modal-cuerpo">
+      <p id="dialogo-texto" class="ayuda"></p>
+      <input id="dialogo-entrada" class="campo" type="password" autocomplete="off">
+      <div class="fila botones">
+        <button class="boton-primario" type="submit">Aceptar</button>
+        <button id="dialogo-cancelar" class="boton-primario secundario" type="button">Cancelar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<input id="archivo-pdf" type="file" accept="application/pdf,.pdf" hidden>
+<input id="archivo-respaldo" type="file" accept="application/json,.json" hidden>
+<div id="soltar" class="soltar" hidden><div><svg><use href="#i-subir"/></svg>Suelta el PDF para agregarlo</div></div>
+<div id="avisos" class="avisos" aria-live="polite"></div>
+
+<div id="error-carga" class="error-carga" hidden>
+  <h2>⚠️ La interfaz no pudo cargar</h2>
+  <p>Recarga la página sin caché (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>). Si sigue igual, envíale a Claude una captura de este cuadro.</p>
+</div>
+<script>
+  window.erroresCarga = [];
+  window.addEventListener("error", function (e) {
+    window.erroresCarga.push((e.message || "Error") + (e.filename ? " (" + e.filename.split("/").pop() + ":" + e.lineno + ")" : ""));
+  });
+  function mostrarErrorCarga(extra) {
+    if (window.appLista) return;
+    if (extra) window.erroresCarga.push(extra);
+    var caja = document.getElementById("error-carga");
+    caja.hidden = false;
+    if (window.erroresCarga.length) {
+      var pre = document.createElement("pre");
+      pre.textContent = "Detalle técnico:\n" + window.erroresCarga.join("\n") + "\n\nNavegador: " + navigator.userAgent;
+      caja.appendChild(pre);
+    }
+  }
+  setTimeout(function () { mostrarErrorCarga(); }, 10000);
+</script>
+<script type="module" src="app.js?v=1" onerror="mostrarErrorCarga('No se pudo descargar app.js')"></script>
+</body>
+</html>

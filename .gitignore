@@ -1,0 +1,10 @@
+.env
+venv/
+__pycache__/
+datos/
+libros/*
+!libros/.gitkeep
+.venv/
+
+# Respaldos (traen tus notas y, si lo elegiste, tu clave cifrada)
+techreader-respaldo-*.json
