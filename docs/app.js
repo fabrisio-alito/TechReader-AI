@@ -17,38 +17,18 @@
 
 // ───────────── 1. Librerías y utilidades ─────────────
 import * as pdfjsLib from "./vendor/pdf.min.js?v=1";
-import { marked } from "./vendor/marked.esm.js?v=1";
-import DOMPurify from "./vendor/purify.es.js?v=1";
-import hljs from "./vendor/highlight.min.js?v=1";
+import { $, limitar, icono, escapar, esMovil, pintarMarkdown, markdownAHtml, avisar, copiarTexto, haceCuanto } from "./js/util.js";
 import * as almacen from "./js/almacen.js";
 import * as gemini from "./js/gemini.js";
 import * as lector from "./js/lector.js";
 import * as voz from "./js/voz.js";
+import "./js/laboratorio.js";                 // agrega "▶ Probar" a los bloques de código
+import * as chat from "./js/chat.js";
+import * as estudio from "./js/estudio.js";
+import * as sinc from "./js/sincronizar.js";
 
 window.appLista = true;
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js?v=1";
-
-const $ = (id) => document.getElementById(id);
-const limitar = (v, min, max) => Math.min(Math.max(v, min), max);
-const icono = (nombre) => `<svg><use href="#i-${nombre}"/></svg>`;
-const escapar = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const esMovil = () => matchMedia("(max-width: 900px)").matches;
-
-/** Markdown -> HTML seguro (DOMPurify quita cualquier script malicioso). */
-function pintarMarkdown(elemento, md) {
-  elemento.innerHTML = DOMPurify.sanitize(marked.parse(md || ""));
-  elemento.querySelectorAll("pre code").forEach((b) => hljs.highlightElement(b));
-}
-
-/** Aviso pequeño abajo de la pantalla. tipo: info | exito | error */
-function avisar(texto, tipo = "info", ms = 4000) {
-  const div = document.createElement("div");
-  div.className = `aviso-flotante ${tipo}`;
-  div.textContent = texto;
-  $("avisos").append(div);
-  setTimeout(() => div.remove(), ms);
-  return div;
-}
 
 /** Ventana que pide un texto (contraseña). Devuelve el texto o null si cancelas. */
 function pedirTexto(titulo, explicacion) {
@@ -153,24 +133,27 @@ function cambiarVista(vista) {
   for (const v of ["lector", "notas", "glosario", "cuestionarios"]) $(`vista-${v}`).hidden = v !== vista;
   ocultarBarraSeleccion();
   if (vista === "notas") pintarTodasLasNotas();
+  if (vista === "glosario") estudio.pintarGlosario();
+  if (vista === "cuestionarios") estudio.pintarRepaso();
   marcarBarraMovil();
 }
 
 function cambiarPestana(nombre) {
   for (const p of document.querySelectorAll(".pestana")) p.classList.toggle("activa", p.dataset.pestana === nombre);
-  for (const n of ["asistente", "pagina", "apuntes"]) $(`panel-${n}`).hidden = n !== nombre;
+  for (const n of ["asistente", "preguntar", "pagina", "apuntes"]) $(`panel-${n}`).hidden = n !== nombre;
+  if (nombre === "preguntar") chat.pintar();
 }
 
 /** En el celular se ve un panel a la vez: "pdf", "asistente" o la vista "notas". */
 function cambiarPanelMovil(panel) {
-  if (panel === "notas") { cambiarVista("notas"); return; }
+  if (["notas", "glosario", "cuestionarios"].includes(panel)) { cambiarVista(panel); return; }
   if (estado.vista !== "lector") cambiarVista("lector");
   $("area").dataset.panelMovil = panel;
   marcarBarraMovil();
 }
 
 function marcarBarraMovil() {
-  const activo = estado.vista === "notas" ? "notas" : $("area").dataset.panelMovil;
+  const activo = estado.vista !== "lector" ? estado.vista : $("area").dataset.panelMovil;
   for (const b of document.querySelectorAll(".barra-movil button")) b.classList.toggle("activo", b.dataset.movil === activo);
 }
 
@@ -400,6 +383,7 @@ async function cargarInfo(numero) {
       ...datos,
     };
     $("texto-extraido").textContent = datos.texto || "(sin texto: página escaneada o en blanco)";
+    if (!$("panel-preguntar").hidden) chat.pintar();
     mostrarTraduccionPagina();
     actualizarProgreso();
     if (!estado.info.traduccion && ajustes.auto) traducirPagina();
@@ -501,6 +485,9 @@ async function traducirPagina() {
     const png = conImagen ? await imagenDePagina(numero) : null;
     const r = await gemini.traducirPagina(datos.tieneTexto ? datos.texto : null, png);
     await almacen.traducciones.guardar(libro.id, numero, r.texto, r.modelo);
+    estudio.agregarVocabularioDe(r.texto, libro.id, numero).then((n) => {
+      if (n) avisar(`📌 ${n} término${n > 1 ? "s" : ""} nuevo${n > 1 ? "s" : ""} en tu glosario`, "exito", 3000);
+    });
     if (libro === estado.libro && numero === estado.pagina) {
       Object.assign(estado.info, { traduccion: r.texto, modelo: r.modelo, traducidas: await almacen.traducciones.contar(libro.id) });
       actualizarProgreso();
@@ -582,6 +569,7 @@ function accionDesdeSeleccion(accion) {
   cambiarPestana("asistente");
   if (esMovil()) { window.getSelection()?.removeAllRanges(); cambiarPanelMovil("asistente"); }
   if (accion === "guardar") guardarFragmento();
+  else if (accion === "preguntar") { cambiarPestana("preguntar"); chat.preguntarSobre(sel.texto); }
   else pedirAccion(accion);
 }
 
@@ -656,6 +644,22 @@ function pintarAsistente() {
       pie.className = "modelo";
       pie.textContent = res.cache ? `Guardado antes · ${res.modelo}` : res.modelo;
       tarjeta.append(pie);
+      // Fragmento corto (una palabra o expresión): se puede mandar al glosario.
+      if (accion === "traducir" && frag.texto.split(/\s+/).length <= 6) {
+        const alGlosario = document.createElement("button");
+        alGlosario.className = "boton-chico";
+        alGlosario.innerHTML = `${icono("lista")}Al glosario`;
+        alGlosario.onclick = async () => {
+          const lineas = res.md.replace(/[*_#>`]/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+          const ok = await almacen.glosario.agregar({
+            termino: frag.texto, traduccion: (lineas[0] || "").slice(0, 120),
+            explicacion: lineas.slice(1).join(" ").slice(0, 300), libroId: estado.libro.id, pagina: frag.pagina,
+          }, { manual: true });
+          avisar(ok ? "Agregado al glosario ✔" : "Ya estaba en tu glosario", ok ? "exito" : "info", 2200);
+          if (ok) estudio.actualizarInsignias();
+        };
+        pie.append(" · ", alGlosario);
+      }
     }
     contenedor.append(tarjeta);
   }
@@ -674,11 +678,6 @@ function pintarAsistente() {
   guardar.innerHTML = frag.notaId ? `${icono("check-circulo")}Guardado en notas` : `${icono("marcador")}Guardar en notas`;
   guardar.onclick = guardarFragmento;
   mas.append(guardar);
-}
-
-async function copiarTexto(texto) {
-  try { await navigator.clipboard.writeText(texto); avisar("Copiado ✔", "exito", 1800); }
-  catch { avisar("No se pudo copiar", "error"); }
 }
 
 // ───────────── 8. Notas ─────────────
@@ -897,7 +896,7 @@ async function escucharIngles() {
   const datos = await extraer(estado.pagina);
   if (!datos.tieneTexto) { avisar("Esta página no tiene texto para leer.", "info"); return; }
   const temporal = document.createElement("div");
-  temporal.innerHTML = DOMPurify.sanitize(marked.parse(datos.texto.replace(/\[\/?(RECUADRO|FIGURA)\]/g, "")));
+  temporal.innerHTML = markdownAHtml(datos.texto.replace(/\[\/?(RECUADRO|FIGURA)\]/g, ""));
   const bloques = voz.bloquesDe(temporal);
   contextoVoz = { tipo: "ingles", pagina: estado.pagina };
   $("rep-titulo").textContent = `Página ${estado.pagina} · original en inglés`;
@@ -953,6 +952,131 @@ $("probar-voz-es").onclick = () => probarVoz("es");
 $("probar-voz-en").onclick = () => probarVoz("en");
 if (!voz.disponible) document.querySelectorAll(".acciones-voz").forEach((e) => e.hidden = true);
 
+/** Pronuncia un texto corto (por ejemplo, un término del glosario). */
+async function decir(texto, idioma = "en") {
+  if (!voz.disponible) { avisarSinVoz(); return; }
+  contextoVoz = { tipo: "tarjeta" };
+  $("rep-titulo").textContent = idioma === "en" ? "Pronunciación" : "Lectura";
+  lectorVoz.leer([{ elemento: null, texto }], { voz: await vozElegida(idioma), velocidad: Math.min(ajustes.velocidadVoz, 1), idioma: idioma === "en" ? "en-US" : "es-ES" });
+}
+
+async function guardarNotaLibre(original, contenido) {
+  if (!estado.libro) return;
+  await almacen.notas.guardar({ libroId: estado.libro.id, libroNombre: estado.libro.titulo || estado.libro.nombre, pagina: estado.pagina, original, contenido });
+  avisar("Guardado en tus notas ✔", "exito", 2200);
+  cargarApuntes();
+}
+
+chat.iniciarChat({
+  libroId: () => estado.libro?.id || null,
+  tituloLibro: () => estado.libro?.titulo || estado.libro?.nombre || "",
+  pagina: () => estado.pagina,
+  textoPagina: async () => (estado.pdf ? (await extraer(estado.pagina)).texto : ""),
+  fragmento: () => estado.fragmento?.texto || "",
+  escuchar: (el, titulo) => escucharElemento(el, titulo),
+  guardarNota: guardarNotaLibre,
+});
+
+estudio.iniciarEstudio({
+  libroId: () => estado.libro?.id || null,
+  tituloLibro: () => estado.libro?.titulo || estado.libro?.nombre || "",
+  pagina: () => estado.pagina,
+  libros: () => estado.libros,
+  decir,
+  async irALibro(libroId, pagina) {
+    if (!(await almacen.libros.obtener(libroId))) { avisar("Ese libro no está en este dispositivo.", "error"); return; }
+    cambiarVista("lector");
+    cambiarPanelMovil("pdf");
+    if (libroId !== estado.libro?.id) await abrirLibro(libroId);
+    irA(pagina);
+  },
+});
+
+// ───────────── 9c. Sincronización (interfaz) ─────────────
+sinc.eventos.addEventListener("estado", async ({ detail }) => {
+  const boton = $("btn-sinc");
+  boton.dataset.estado = detail.estado;
+  boton.title = {
+    ok: "Sincronizado ✔ (clic para sincronizar ahora)",
+    sincronizando: "Sincronizando…",
+    error: `Error de sincronización: ${detail.mensaje}`,
+    apagado: "Sincronización desactivada (configúrala en Ajustes)",
+  }[detail.estado] || "";
+  if (!$("ajustes").hidden) pintarEstadoSinc();
+  const r = detail.resumen;
+  if (detail.estado === "ok" && r && (r.libros || r.traducciones || r.notas || r.glosario || r.borrados || r.asistente)) {
+    await refrescarTrasSincronizar(r);
+  }
+});
+
+/** Llegaron datos de otro dispositivo: actualizamos lo visible sin interrumpir tu lectura. */
+async function refrescarTrasSincronizar(r) {
+  const antes = estado.libro;
+  estado.libros = (await almacen.libros.todos()).sort((a, b) => (b.actualizado || "").localeCompare(a.actualizado || ""));
+  pintarMenuLibros();
+  cargarApuntes();
+  estudio.actualizarInsignias();
+  if (estado.vista === "notas") pintarTodasLasNotas();
+  if (estado.vista === "glosario") estudio.pintarGlosario();
+  if (antes && estado.info && !estado.info.traduccion) {
+    const t = await almacen.traducciones.obtener(antes.id, estado.pagina);
+    if (t) { Object.assign(estado.info, { traduccion: t.texto, modelo: t.modelo }); mostrarTraduccionPagina(); }
+  }
+  // ¿En otro dispositivo avanzaste más en este libro?
+  const remoto = antes && estado.libros.find((l) => l.id === antes.id);
+  if (remoto && remoto.ultimaPagina > estado.pagina + 1) {
+    const aviso = avisar(`En otro dispositivo llegaste a la página ${remoto.ultimaPagina}.`, "info con-accion", 12000);
+    const ir = document.createElement("button");
+    ir.className = "boton-chico";
+    ir.textContent = "Ir ahí";
+    ir.onclick = () => { aviso.remove(); irA(remoto.ultimaPagina); };
+    aviso.append(ir);
+  }
+  const partes = [r.notas && `${r.notas} notas`, r.traducciones && `${r.traducciones} páginas`, r.glosario && `${r.glosario} términos`].filter(Boolean);
+  if (partes.length) avisar(`☁️ Llegó de tus otros dispositivos: ${partes.join(", ")}`, "exito", 4000);
+}
+
+async function pintarEstadoSinc() {
+  const c = await sinc.configuracion();
+  // Si ya empezaste a escribir en estos campos, no los pisamos con lo guardado.
+  if (!$("sinc-repo").dataset.editado) $("sinc-repo").value = c.repo;
+  if (!$("sinc-token").dataset.editado) $("sinc-token").value = "";
+  $("sinc-token").placeholder = c.token ? `Guardado (…${c.token.slice(-4)})` : "github_pat_…";
+  $("sinc-auto").checked = c.auto;
+  const estadoBoton = $("btn-sinc").dataset.estado;
+  $("estado-sinc").textContent = !c.repo || !c.token ? "desactivada" : estadoBoton === "error" ? "⚠️ con error" : "✔ conectada";
+  $("sinc-ultima").textContent = c.ultima ? `Última sincronización: ${haceCuanto(c.ultima)}.` : "";
+}
+
+$("btn-sinc").onclick = async () => {
+  const c = await sinc.configuracion();
+  if (!c.repo || !c.token) { abrirAjustes(true); return; }
+  sinc.sincronizar().then(() => avisar("Sincronizado ✔", "exito", 2000)).catch((e) => avisar(e.message, "error", 7000));
+};
+$("sinc-conectar").onclick = async () => {
+  const boton = $("sinc-conectar");
+  const c = await sinc.configuracion();
+  const repo = $("sinc-repo").value.trim() || c.repo;
+  const token = $("sinc-token").value.trim() || c.token;
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo.replace(/^https?:\/\/github\.com\//, "").replace(/\.git$|\/$/g, ""))) { avisar("Escribe el repositorio como usuario/nombre, por ejemplo fabrisio-alito/techreader-datos", "error", 6000); return; }
+  if (!token) { avisar("Pega tu token de GitHub.", "error"); return; }
+  boton.disabled = true;
+  try {
+    await sinc.conectar(repo, token);
+    delete $("sinc-repo").dataset.editado;
+    delete $("sinc-token").dataset.editado;
+    avisar("Sincronización activada ✔", "exito");
+  } catch (e) {
+    avisar(e.message, "error", 8000);
+  } finally {
+    boton.disabled = false;
+    pintarEstadoSinc();
+  }
+};
+for (const id of ["sinc-repo", "sinc-token"]) $(id).addEventListener("input", (e) => { e.target.dataset.editado = "1"; });
+$("sinc-desconectar").onclick = async () => { await sinc.desconectar(); pintarEstadoSinc(); avisar("Sincronización desactivada", "info"); };
+$("sinc-auto").onchange = (e) => sinc.guardarConfiguracion({ auto: e.target.checked });
+
 // ───────────── 10. Ajustes: clave, PIN, respaldo ─────────────
 async function abrirAjustes(mostrar = true) {
   $("ajustes").hidden = !mostrar;
@@ -964,6 +1088,7 @@ async function abrirAjustes(mostrar = true) {
   $("ajuste-modelos").value = (await gemini.obtenerModelos()).join(", ");
   $("estado-pin").textContent = (await almacen.config.obtener("pin")) ? "✔ activado" : "desactivado";
   llenarVoces();
+  pintarEstadoSinc();
   const esp = await almacen.espacio();
   $("espacio-usado").textContent = esp ? `Usas ${esp.usadoMB} MB de ${esp.totalMB} MB disponibles.` : "";
 }
@@ -1015,12 +1140,13 @@ async function exportarRespaldo() {
   datos.modelos = await gemini.obtenerModelos();
   if ($("respaldo-con-clave").checked) {
     const clave = await gemini.obtenerClave();
-    if (!clave) { avisar("No hay clave guardada para incluir.", "error"); return; }
+    const s = await sinc.configuracion();
+    if (!clave && !s.token) { avisar("No hay clave ni token guardados para incluir.", "error"); return; }
     const c1 = await pedirTexto("Contraseña del respaldo", "Con esta contraseña se cifra tu clave de Gemini. La necesitarás al importar el respaldo en otro dispositivo.");
     if (!c1) return;
     const c2 = await pedirTexto("Repite la contraseña", "Escríbela de nuevo para confirmar.");
     if (c1 !== c2) { avisar("Las contraseñas no coinciden.", "error"); return; }
-    datos.claveCifrada = await cifrar(clave, c1);
+    datos.claveCifrada = await cifrar(JSON.stringify({ gemini: clave, githubRepo: s.repo, githubToken: s.token }), c1);
   }
   const fecha = new Date().toISOString().slice(0, 10);
   descargar(`techreader-respaldo-${fecha}.json`, JSON.stringify(datos));
@@ -1031,20 +1157,31 @@ async function importarRespaldo(archivo) {
   if (!archivo) return;
   try {
     const datos = JSON.parse(await archivo.text());
-    const r = await almacen.importarDatos(datos);
+    const r = await almacen.fusionar(datos);
     if (datos.claveCifrada) {
       const contrasena = await pedirTexto("Contraseña del respaldo", "Este respaldo trae tu clave de Gemini cifrada. Escribe la contraseña que usaste al crearlo.");
       if (contrasena) {
+        let secretos = null;
         try {
-          await almacen.config.guardar("geminiClave", await descifrar(datos.claveCifrada, contrasena));
-          if (datos.modelos?.length) await almacen.config.guardar("geminiModelos", datos.modelos);
-          avisar("Clave de Gemini restaurada ✔", "exito");
+          const texto = await descifrar(datos.claveCifrada, contrasena);
+          // Respaldos nuevos guardan un JSON {gemini, githubRepo, githubToken}; los viejos, solo la clave.
+          secretos = texto.trim().startsWith("{") ? JSON.parse(texto) : { gemini: texto };
         } catch { avisar("Contraseña incorrecta: la clave no se restauró (el resto sí).", "error", 7000); }
+        if (secretos) {
+          if (secretos.gemini) await almacen.config.guardar("geminiClave", secretos.gemini);
+          if (datos.modelos?.length) await almacen.config.guardar("geminiModelos", datos.modelos);
+          if (secretos.githubRepo && secretos.githubToken) {
+            await sinc.guardarConfiguracion({ repo: secretos.githubRepo, token: secretos.githubToken });
+            sinc.sincronizar().catch(() => {});
+          }
+          avisar(secretos.githubToken ? "Clave de Gemini y sincronización restauradas ✔" : "Clave de Gemini restaurada ✔", "exito");
+        }
       }
     } else if (datos.modelos?.length && !(await gemini.obtenerModelos()).length) {
       await almacen.config.guardar("geminiModelos", datos.modelos);
     }
-    avisar(`Importado: ${r.libros} libros, ${r.traducciones} páginas traducidas, ${r.asistente} resultados y ${r.notas} notas.`, "exito", 7000);
+    avisar(`Importado: ${r.libros} libros, ${r.traducciones} páginas traducidas, ${r.asistente} resultados, ${r.notas} notas y ${r.glosario} términos.`, "exito", 7000);
+    estudio.actualizarInsignias();
     abrirAjustes(false);
     await cargarLibros();
   } catch (e) {
@@ -1276,6 +1413,8 @@ async function iniciar() {
   }
   await comprobarPin();
   await cargarLibros();
+  estudio.actualizarInsignias();
+  sinc.iniciarAutomatica();
   if (estado.libros.length && !(await gemini.obtenerClave())) {
     avisar("Falta tu clave de Gemini para usar la IA: ⚙️ Ajustes → Gemini.", "info", 7000);
   }

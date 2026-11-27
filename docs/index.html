@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="iconos/icono-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="stylesheet" href="estilos.css?v=2">
+  <link rel="stylesheet" href="estilos.css?v=3">
 </head>
 <body>
 
@@ -63,6 +63,9 @@
   <symbol id="i-pausa" viewBox="0 0 24 24"><path d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-atras" viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></symbol>
   <symbol id="i-adelante" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></symbol>
+  <symbol id="i-nube" viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4.75 4.75 0 0 1-.5 9.5z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+  <symbol id="i-cerebro" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3h1V4zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3h-1V4z"/></symbol>
   <symbol id="i-salir" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></symbol>
 </svg>
 
@@ -79,10 +82,11 @@
       <button class="nav-item activo" data-vista="lector"><svg><use href="#i-lector"/></svg>Lector</button>
       <button class="nav-item" data-vista="notas"><svg><use href="#i-lapiz"/></svg>Mis Notas</button>
       <button class="nav-item" data-vista="glosario"><svg><use href="#i-lista"/></svg>Glosario</button>
-      <button class="nav-item" data-vista="cuestionarios"><svg><use href="#i-check-circulo"/></svg>Cuestionarios</button>
+      <button class="nav-item" data-vista="cuestionarios"><svg><use href="#i-cerebro"/></svg>Repaso <span class="contador insignia" data-insignia-repaso hidden></span></button>
     </nav>
 
     <div class="cabecera-derecha">
+      <button id="btn-sinc" class="boton-icono grande indicador-sinc" data-estado="apagado" title="Sincronización: desactivada (configúrala en Ajustes)" aria-label="Sincronización"><svg><use href="#i-nube"/></svg><span class="punto-sinc"></span></button>
       <button id="btn-instalar" class="boton-icono grande" title="Instalar como app" aria-label="Instalar como app" hidden><svg><use href="#i-instalar"/></svg></button>
       <button id="btn-ajustes" class="boton-icono grande" title="Ajustes" aria-label="Ajustes"><svg><use href="#i-engranaje"/></svg></button>
       <button id="avatar" class="avatar" title="Ajustes">F</button>
@@ -169,6 +173,7 @@
       <section class="tarjeta tarjeta-asistente" aria-label="Asistente">
         <div class="pestanas" role="tablist">
           <button class="pestana activa" data-pestana="asistente" role="tab"><svg><use href="#i-chispa"/></svg><span>Asistente IA</span></button>
+          <button class="pestana" data-pestana="preguntar" role="tab"><svg><use href="#i-chat"/></svg><span>Preguntar</span></button>
           <button class="pestana" data-pestana="pagina" role="tab"><svg><use href="#i-globo"/></svg><span>Traducir página</span></button>
           <button class="pestana" data-pestana="apuntes" role="tab"><svg><use href="#i-cuaderno"/></svg><span>Apuntes</span> <span id="contador-apuntes" class="contador"></span></button>
           <div class="tamano-letra" title="Tamaño de letra">
@@ -199,6 +204,19 @@
             <div id="tarjetas"></div>
             <div id="mas-acciones" class="mas-acciones"></div>
           </div>
+        </div>
+
+        <div id="panel-preguntar" class="panel-contenido panel-chat" hidden>
+          <div class="chat-contexto">
+            <span><svg><use href="#i-chat"/></svg>Preguntas sobre la <b>página <span id="chat-pagina">–</span></b></span>
+            <button id="chat-nueva" class="boton-chico" hidden>Nueva conversación</button>
+          </div>
+          <div id="chat-mensajes" class="chat-mensajes"></div>
+          <div id="chat-sugerencias" class="chat-sugerencias"></div>
+          <form id="chat-form" class="chat-form">
+            <textarea id="chat-entrada" rows="1" placeholder="Escribe tu pregunta… (Enter para enviar)"></textarea>
+            <button class="boton-primario" type="submit" aria-label="Enviar">Enviar</button>
+          </form>
         </div>
 
         <div id="panel-pagina" class="panel-contenido" hidden>
@@ -257,19 +275,44 @@
   </section>
 
   <section id="vista-glosario" class="vista vista-pagina" hidden>
-    <div class="contenedor proximamente">
-      <div class="vacio-ilustracion grande"><svg><use href="#i-lista"/></svg></div>
-      <h1>Glosario</h1>
-      <p>Aquí se juntarán automáticamente los términos técnicos que traduces (los del 📌 Vocabulario), con su traducción y una explicación corta.</p>
-      <span class="insignia">Próximo sprint</span>
+    <div class="contenedor">
+      <div class="vista-cabecera">
+        <div>
+          <h1>Glosario <span id="glosario-total" class="contador grande"></span></h1>
+          <p>Los términos del <b>📌 Vocabulario</b> de tus traducciones se agregan solos. También puedes agregar los tuyos.</p>
+        </div>
+        <div class="vista-filtros">
+          <label class="campo campo-busqueda"><svg><use href="#i-buscar"/></svg><input id="filtro-glosario" type="search" placeholder="Buscar término…"></label>
+          <select id="filtro-glosario-libro" class="campo"></select>
+        </div>
+      </div>
+      <details class="formulario-plegable">
+        <summary>＋ Agregar un término</summary>
+        <form id="form-glosario" class="fila">
+          <input id="g-termino" class="campo" placeholder="Término en inglés (ej. viewport)" required maxlength="60">
+          <input id="g-traduccion" class="campo" placeholder="Traducción" required maxlength="120">
+          <input id="g-explicacion" class="campo" placeholder="Explicación corta (opcional)" maxlength="300">
+          <button class="boton-primario">Agregar</button>
+        </form>
+      </details>
+      <div id="lista-glosario" class="cuadricula-glosario"></div>
     </div>
   </section>
+
   <section id="vista-cuestionarios" class="vista vista-pagina" hidden>
-    <div class="contenedor proximamente">
-      <div class="vacio-ilustracion grande"><svg><use href="#i-check-circulo"/></svg></div>
-      <h1>Cuestionarios</h1>
-      <p>Preguntas y tarjetas de repaso generadas a partir de tus notas, para que recuerdes lo que leíste.</p>
-      <span class="insignia">Próximo sprint</span>
+    <div class="contenedor contenedor-estrecho">
+      <div class="vista-cabecera">
+        <div>
+          <h1>Repaso</h1>
+          <p>Repasa tus términos justo antes de olvidarlos, y ponte a prueba con lo que leíste.</p>
+        </div>
+        <div class="segmentado" id="repaso-modo">
+          <button data-modo="tarjetas" class="activo">🧠 Tarjetas</button>
+          <button data-modo="cuestionario">📝 Cuestionario con IA</button>
+        </div>
+      </div>
+      <div id="repaso-tarjetas"></div>
+      <div id="repaso-cuestionario" hidden></div>
     </div>
   </section>
 
@@ -277,7 +320,9 @@
   <nav class="barra-movil" aria-label="Navegación">
     <button data-movil="pdf" class="activo"><svg><use href="#i-lector"/></svg>Libro</button>
     <button data-movil="asistente"><svg><use href="#i-chispa"/></svg>Asistente</button>
-    <button data-movil="notas"><svg><use href="#i-lapiz"/></svg>Mis notas</button>
+    <button data-movil="glosario"><svg><use href="#i-lista"/></svg>Glosario</button>
+    <button data-movil="cuestionarios"><svg><use href="#i-cerebro"/></svg>Repaso<span class="contador insignia" data-insignia-repaso hidden></span></button>
+    <button data-movil="notas"><svg><use href="#i-lapiz"/></svg>Notas</button>
   </nav>
 </div>
 
@@ -351,7 +396,44 @@
   <button data-accion="explicar"><svg><use href="#i-bombilla"/></svg>Explicar</button>
   <button data-accion="resumir"><svg><use href="#i-documento"/></svg>Resumir</button>
   <button data-accion="ejemplo"><svg><use href="#i-codigo"/></svg>Ejemplo</button>
+  <button data-accion="preguntar"><svg><use href="#i-chat"/></svg>Preguntar</button>
   <button data-accion="guardar"><svg><use href="#i-marcador"/></svg>Guardar</button>
+</div>
+
+<!-- ═══════════ Laboratorio (▶ Probar código) ═══════════ -->
+<div id="laboratorio" class="modal-fondo laboratorio-fondo" data-modo="web" data-vista-movil="codigo" hidden>
+  <div class="laboratorio" role="dialog" aria-label="Laboratorio de código">
+    <div class="lab-cabecera">
+      <h2><svg><use href="#i-play"/></svg>Laboratorio</h2>
+      <div class="segmentado" id="lab-pestanas">
+        <button data-pestana="html">HTML</button>
+        <button data-pestana="css">CSS</button>
+        <button data-pestana="js">JS</button>
+        <button data-pestana="python">Python</button>
+      </div>
+      <div class="lab-acciones">
+        <button id="lab-ia" class="boton-chico" title="Gemini completa el fragmento para que se pueda ejecutar"><svg><use href="#i-chispa"/></svg><span>Hacer ejecutable</span></button>
+        <button id="lab-restablecer" class="boton-chico" title="Volver al código original">Restablecer</button>
+        <button id="lab-copiar" class="boton-chico" title="Copiar el código"><svg><use href="#i-copiar"/></svg></button>
+        <button id="lab-ejecutar" class="boton-primario" title="Ejecutar (Ctrl + Enter)"><svg><use href="#i-play"/></svg><span>Ejecutar</span></button>
+        <button id="lab-cerrar" class="boton-icono" aria-label="Cerrar laboratorio"><svg><use href="#i-cerrar"/></svg></button>
+      </div>
+    </div>
+    <div class="segmentado solo-movil lab-vista-movil" id="lab-vista-movil">
+      <button data-vista="codigo">Código</button>
+      <button data-vista="resultado">Resultado</button>
+    </div>
+    <div class="lab-cuerpo">
+      <div class="lab-editor"><textarea id="lab-codigo" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Editor de código"></textarea></div>
+      <div class="lab-salida">
+        <iframe id="lab-iframe" class="lab-iframe" sandbox="allow-scripts allow-modals allow-forms" title="Resultado"></iframe>
+        <div class="lab-consola-caja">
+          <div class="lab-consola-titulo"><span>Consola</span><button id="lab-limpiar" class="enlace">Limpiar</button></div>
+          <div id="lab-consola" class="lab-consola"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════ Ajustes ═══════════ -->
@@ -425,9 +507,36 @@
         <input id="ajuste-nombre" class="campo" type="text" maxlength="30">
       </div>
 
+      <h3>Sincronización entre dispositivos</h3>
+      <p class="ayuda">Tus notas, traducciones, glosario y progreso se guardan en un repositorio <b>privado</b> de tu GitHub y se sincronizan solos. Los PDF y tu clave de Gemini <b>no</b> se suben. <span id="sinc-ultima"></span></p>
+      <details class="guia">
+        <summary>¿Cómo lo configuro? (5 minutos, una sola vez)</summary>
+        <ol>
+          <li>Crea un repositorio <b>Private</b> llamado <code>techreader-datos</code> en <a href="https://github.com/new" target="_blank" rel="noopener">github.com/new</a>.</li>
+          <li>Crea un token en <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained token</a>:
+            <i>Repository access</i> → <b>Only select repositories</b> → <code>techreader-datos</code>;
+            <i>Permissions</i> → <b>Contents: Read and write</b>; vencimiento: 1 año.</li>
+          <li>Copia el token (empieza con <code>github_pat_</code>) y pégalo aquí abajo.</li>
+          <li>En tus otros dispositivos haz lo mismo, o importa un respaldo que incluya el token.</li>
+        </ol>
+      </details>
+      <div class="ajuste">
+        <span>Repositorio <b id="estado-sinc"></b></span>
+        <input id="sinc-repo" class="campo" type="text" placeholder="tu-usuario/techreader-datos" spellcheck="false" autocapitalize="off">
+      </div>
+      <div class="ajuste">
+        <span>Token de GitHub</span>
+        <input id="sinc-token" class="campo" type="password" placeholder="github_pat_…" autocomplete="off">
+      </div>
+      <div class="fila botones">
+        <button id="sinc-conectar" class="boton-primario"><svg><use href="#i-nube"/></svg><span>Conectar y sincronizar</span></button>
+        <button id="sinc-desconectar" class="boton-primario secundario">Desconectar</button>
+      </div>
+      <label class="interruptor"><input id="sinc-auto" type="checkbox" checked><span>Sincronizar automáticamente</span></label>
+
       <h3>Tus datos</h3>
       <p class="ayuda">Todo vive en este navegador. Haz un respaldo de vez en cuando y úsalo para pasar tu avance a otro dispositivo. <span id="espacio-usado"></span></p>
-      <label class="interruptor"><input id="respaldo-con-clave" type="checkbox"><span>Incluir mi clave de Gemini en el respaldo (cifrada con una contraseña)</span></label>
+      <label class="interruptor"><input id="respaldo-con-clave" type="checkbox"><span>Incluir mi clave de Gemini y mi token de sincronización (cifrados con una contraseña)</span></label>
       <div class="fila botones">
         <button id="btn-exportar" class="boton-primario"><svg><use href="#i-descargar"/></svg><span>Descargar respaldo</span></button>
         <button id="btn-importar" class="boton-primario secundario"><svg><use href="#i-subir"/></svg><span>Importar respaldo</span></button>
@@ -451,6 +560,8 @@
         <p><kbd>T</kbd><span>traducir la selección (o la página si no hay selección)</span></p>
         <p><kbd>E</kbd><span>explicar la selección</span></p>
         <p><kbd>L</kbd><span>escuchar la página / pausar la lectura</span></p>
+        <p><kbd>Espacio</kbd> <kbd>1</kbd>–<kbd>4</kbd><span>en Repaso: mostrar respuesta y calificar</span></p>
+        <p><kbd>Ctrl</kbd> <kbd>Enter</kbd><span>en el Laboratorio: ejecutar</span></p>
         <p><kbd>+</kbd> <kbd>−</kbd><span>tamaño de letra</span></p>
         <p><kbd>Ctrl</kbd> <kbd>F</kbd><span>buscar en el libro</span></p>
         <p><kbd>Esc</kbd><span>cerrar menús</span></p>
@@ -501,6 +612,6 @@
   }
   setTimeout(function () { mostrarErrorCarga(); }, 10000);
 </script>
-<script type="module" src="app.js?v=2" onerror="mostrarErrorCarga('No se pudo descargar app.js')"></script>
+<script type="module" src="app.js?v=3" onerror="mostrarErrorCarga('No se pudo descargar app.js')"></script>
 </body>
 </html>

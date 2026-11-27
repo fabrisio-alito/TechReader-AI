@@ -9,7 +9,7 @@
    Las llamadas a Gemini tampoco se guardan (son de otro dominio).
    ========================================================================== */
 
-const CACHE = "techreader-v1";
+const CACHE = "techreader-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 

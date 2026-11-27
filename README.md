@@ -65,16 +65,51 @@ Cada vez que cambies algo: `git add .` → `git commit -m "qué cambié"` → `g
 - Usa las voces de tu dispositivo, es gratis y no gasta cuota. En ⚙️ Ajustes → *Lectura en voz alta* eliges la voz. En Edge y en Android suele haber voces "naturales" que suenan mejor.
 - Código: `docs/js/voz.js` (Web Speech API, `speechSynthesis`).
 
-### A.4 Respaldo: pasar tu avance de un dispositivo a otro
+### A.4 Probar código ▶️
+
+- Cada bloque de código (en traducciones, asistente y chat) tiene **▶ Probar**. Se abre el *laboratorio*: editas a la izquierda y ves el resultado a la derecha.
+- **HTML/CSS/JS** corre en un `<iframe sandbox>` sin acceso a tu app ni a tus datos (no puede leer tu clave). `console.log` y los errores aparecen en la consola de abajo, con número de línea.
+- **Python** corre en tu navegador con Pyodide. La primera vez descarga unos 10 MB; después queda en caché. Si un programa tarda más de 20 s (un bucle infinito), se detiene solo. `input()` no está disponible.
+- **✨ Hacer ejecutable** le pide a Gemini que complete un fragmento suelto para que funcione.
+- Atajos: `Ctrl+Enter` ejecuta, `Tab` indenta, `Esc` cierra.
+
+### A.5 Pregúntale al libro 💬
+
+- Pestaña **Preguntar** del asistente, o selecciona texto → **Preguntar**.
+- Gemini responde usando el texto de la página en la que estás y recuerda la conversación de esa página.
+- Cada respuesta se puede escuchar, copiar o guardar en tus notas.
+
+### A.6 Glosario y repaso 🧠
+
+- Los términos del **📌 Vocabulario** de cada traducción entran solos al **Glosario**. También puedes agregar los tuyos (o usar **Al glosario** al traducir una palabra suelta).
+- Si borras un término, no vuelve a agregarse solo.
+- **Repaso → Tarjetas**: repetición espaciada (algoritmo SM-2, el de Anki). Calificas Otra vez / Difícil / Bien / Fácil (teclas 1–4) y la app decide cuándo volver a preguntarte. El número rojo en el menú dice cuántas tocan hoy.
+- **Repaso → Cuestionario con IA**: Gemini arma preguntas de opción múltiple con lo que traduciste, tus notas y tu glosario.
+
+### A.7 Sincronización automática ☁️
+
+Tus datos se guardan en un repositorio **privado** de GitHub tuyo, y cada dispositivo se sincroniza solo.
+
+1. Crea un repositorio **privado** vacío, por ejemplo `techreader-datos` (github.com/new → Private).
+2. Crea un token: GitHub → Settings → Developer settings → **Fine-grained tokens** → *Generate new token*.
+   - *Repository access*: **Only select repositories** → `techreader-datos`.
+   - *Permissions → Repository permissions → Contents*: **Read and write**. Nada más.
+   - Ponle fecha de vencimiento (por ejemplo, 1 año).
+3. En la app: ⚙️ Ajustes → **Sincronización** → pega `tu-usuario/techreader-datos` y el token → **Conectar**.
+4. Repite el paso 3 en cada dispositivo (o importa un respaldo con la casilla de claves marcada).
+
+Cómo funciona: se sincroniza al abrir, 15 s después de cada cambio, al volver a la pestaña y cada 5 min. Si dos dispositivos cambian lo mismo, gana el cambio más reciente; lo borrado se recuerda para que no "reviva". El token vive solo en tu navegador; nunca va al repositorio público de la app.
+
+### A.8 Respaldo manual
 
 - ⚙️ **Ajustes → Tus datos → Descargar respaldo** genera un archivo `.json` con tu progreso, traducciones y notas (sin los PDF).
-- Marca **"Incluir mi clave de Gemini"** para que el respaldo la lleve **cifrada** con una contraseña tuya.
+- Marca **"Incluir mis claves"** para que el respaldo lleve tu clave de Gemini y tu token de GitHub **cifrados** con una contraseña tuya.
 - En el otro dispositivo: **Importar respaldo**. Luego agrega el mismo PDF y continúas donde ibas.
 - **Desde la versión Python (tu laptop):** con `python servidor.py` corriendo, abre `http://localhost:8000/api/respaldo`. Se descarga un respaldo con todo lo que ya hiciste, que puedes importar en la versión web.
 
 ⚠️ Tus datos viven en el navegador. **No borres "Cookies y datos de sitios"** del navegador o los perderás. Descarga un respaldo de vez en cuando.
 
-### A.5 Cómo está hecha (para aprender)
+### A.9 Cómo está hecha (para aprender)
 
 ```
 docs/
@@ -82,10 +117,17 @@ docs/
 ├── estilos.css           diseño (escritorio + celular)
 ├── app.js                interfaz y comportamiento
 ├── js/
+│   ├── util.js           funciones pequeñas que usan todos los módulos
 │   ├── lector.js         extracción de texto del PDF (traducción de lector.py a JavaScript)
 │   ├── gemini.js         llamadas a Gemini con fetch() (reemplaza a traductor.py)
 │   ├── almacen.js        base de datos del navegador, IndexedDB (reemplaza a db.py + SQLite)
-│   └── voz.js            lectura en voz alta con las voces del dispositivo
+│   ├── voz.js            lectura en voz alta con las voces del dispositivo
+│   ├── laboratorio.js    "Probar código": iframe sandbox + consola
+│   ├── python-worker.js  Pyodide en un Web Worker (para poder cortarlo a los 20 s)
+│   ├── chat.js           "Preguntar": conversación por página
+│   ├── repaso.js         algoritmo SM-2 de repetición espaciada (sin interfaz: fácil de leer)
+│   ├── estudio.js        pantallas de Glosario, Tarjetas y Cuestionario
+│   └── sincronizar.js    sincronización con tu repo privado (API de GitHub)
 ├── prompts/*.md          las mismas instrucciones para la IA
 ├── manifest.webmanifest  permite "instalarla" como app
 ├── sw.js                 service worker: abre sin internet (estrategia "red primero")

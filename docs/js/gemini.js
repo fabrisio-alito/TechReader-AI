@@ -66,18 +66,22 @@ export function elegirModelos(nombres) {
   return elegidos.length ? elegidos : lista.slice(0, 3);
 }
 
-/** Llama a Gemini con un prompt y un contenido (texto y/o imagen).
+/** Llama a Gemini.
+ *  - nombrePrompt: archivo de prompts/ con las instrucciones (system instruction)
+ *  - contenidos:   lista de turnos [{ role: "user"|"model", parts: [...] }]
+ *  - opciones.extra: texto que se agrega a las instrucciones (ej. el texto de la página)
+ *  - opciones.json:  true para pedir la respuesta en JSON (cuestionarios)
  *  Devuelve { texto, modelo }. */
-async function generar(nombrePrompt, partes) {
+async function generar(nombrePrompt, contenidos, { extra = "", json = false } = {}) {
   const clave = await obtenerClave();
   if (!clave) throw new ErrorGemini("Falta tu clave de Gemini. Ve a ⚙️ Ajustes → Gemini.");
   const modelos = await obtenerModelos();
   if (!modelos.length) throw new ErrorGemini("No hay modelos configurados. Ve a ⚙️ Ajustes → Gemini → Probar clave.");
 
   const cuerpo = {
-    systemInstruction: { parts: [{ text: await leerPrompt(nombrePrompt) }] },
-    contents: [{ role: "user", parts: partes }],
-    generationConfig: { temperature: 0.2 },
+    systemInstruction: { parts: [{ text: (await leerPrompt(nombrePrompt)) + (extra ? `\n\n${extra}` : "") }] },
+    contents: contenidos,
+    generationConfig: { temperature: json ? 0.4 : 0.2, ...(json ? { responseMimeType: "application/json" } : {}) },
   };
 
   let ultimoError = "";
@@ -109,12 +113,14 @@ async function generar(nombrePrompt, partes) {
   );
 }
 
+const turnoUsuario = (partes) => [{ role: "user", parts: partes }];
+
 /** Traduce una página. imagenBase64 = PNG de la página (opcional). */
 export function traducirPagina(texto, imagenBase64) {
   const partes = [];
   if (imagenBase64) partes.push({ inlineData: { mimeType: "image/png", data: imagenBase64 } });
   partes.push({ text: texto ? `Texto extraído de la página:\n\n${texto}` : "Traduce el contenido de esta página (es una imagen)." });
-  return generar("traducir_pagina.md", partes);
+  return generar("traducir_pagina.md", turnoUsuario(partes));
 }
 
 const PROMPTS_ASISTENTE = {
@@ -129,5 +135,43 @@ export function usarAsistente(texto, accion, libro = "") {
   if (!PROMPTS_ASISTENTE[accion]) throw new ErrorGemini(`Acción desconocida: ${accion}`);
   if (texto.length > 6000) throw new ErrorGemini("La selección es muy larga. Para eso usa «Traducir página».");
   const contexto = libro ? `Libro: ${libro}\n\n` : "";
-  return generar(PROMPTS_ASISTENTE[accion], [{ text: `${contexto}Fragmento seleccionado:\n\n${texto}` }]);
+  return generar(PROMPTS_ASISTENTE[accion], turnoUsuario([{ text: `${contexto}Fragmento seleccionado:\n\n${texto}` }]));
+}
+
+/** "Pregúntale al libro": conversación con el texto de la página como contexto.
+ *  historial = [{ rol: "usuario"|"ia", texto }] (el último es tu pregunta). */
+export function conversar(historial, { libro, pagina, textoPagina, fragmento }) {
+  const extra = [
+    `LIBRO: ${libro}`,
+    `PÁGINA QUE ESTÁ LEYENDO: ${pagina}`,
+    fragmento ? `FRAGMENTO QUE SELECCIONÓ ANTES:\n${fragmento}` : "",
+    `TEXTO DE LA PÁGINA (en inglés, extraído del PDF):\n"""\n${(textoPagina || "(página sin texto)").slice(0, 12000)}\n"""`,
+  ].filter(Boolean).join("\n\n");
+  const contenidos = historial.map((m) => ({ role: m.rol === "ia" ? "model" : "user", parts: [{ text: m.texto }] }));
+  return generar("preguntar.md", contenidos, { extra });
+}
+
+/** Cuestionario de opción múltiple sobre lo que leíste. Devuelve un arreglo de preguntas. */
+export async function crearCuestionario(material, cantidad = 5) {
+  const r = await generar("cuestionario.md",
+    turnoUsuario([{ text: `Crea ${cantidad} preguntas a partir de este material:\n\n${material.slice(0, 24000)}` }]),
+    { json: true });
+  let datos;
+  try {
+    datos = JSON.parse(r.texto.replace(/^```(json)?|```$/g, "").trim());
+  } catch {
+    throw new ErrorGemini("La IA no devolvió el cuestionario en el formato esperado. Intenta de nuevo.");
+  }
+  const preguntas = (Array.isArray(datos) ? datos : datos.preguntas || []).filter((p) =>
+    p?.pregunta && Array.isArray(p.opciones) && p.opciones.length >= 2 && Number.isInteger(p.correcta) && p.correcta >= 0 && p.correcta < p.opciones.length);
+  if (!preguntas.length) throw new ErrorGemini("La IA no generó preguntas válidas. Intenta de nuevo.");
+  return { preguntas, modelo: r.modelo };
+}
+
+/** Convierte un fragmento de código en un ejemplo completo que se pueda ejecutar. */
+export async function hacerEjecutable(codigo, lenguaje) {
+  const r = await generar("laboratorio.md",
+    turnoUsuario([{ text: `Lenguaje: ${lenguaje}\n\nFragmento:\n\`\`\`\n${codigo}\n\`\`\`` }]));
+  const bloque = r.texto.match(/```(\w*)\n([\s\S]*?)```/);
+  return { codigo: bloque ? bloque[2].trimEnd() : r.texto, lenguaje: bloque?.[1] || lenguaje, explicacion: r.texto.replace(/```[\s\S]*?```/, "").trim(), modelo: r.modelo };
 }
