@@ -399,6 +399,8 @@ input[type="range"] { width: 100%; accent-color: var(--acento); cursor: pointer;
 @keyframes brillo { from { background-position: 100% 0; } to { background-position: -50% 0; } }
 
 /* Panel "Traducir página" */
+#modo-lectura button { padding: 6px 11px; }
+@media (max-width: 420px) { #modo-lectura { flex: 1 1 100%; } #modo-lectura button { flex: 1; padding: 6px 4px; } }
 .acciones-pagina { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .estado-pagina { font-size: 13px; color: var(--texto-suave); margin-bottom: 10px; }
 .estado-pagina .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--texto-tenue); margin-right: 7px; }
@@ -734,7 +736,7 @@ input[type="range"] { width: 100%; accent-color: var(--acento); cursor: pointer;
 .guia summary { cursor: pointer; color: var(--acento); }
 .guia ol { padding-left: 18px; line-height: 1.6; }
 .guia a { color: var(--acento); }
-.aviso-flotante.con-accion { pointer-events: auto; display: flex; gap: 12px; align-items: center; }
+.aviso-flotante.con-accion { pointer-events: auto; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .aviso-flotante.con-accion button { flex: none; }
 
 /* Pestañas del asistente: con 4 pestañas, en pantallas medianas solo la activa muestra texto */

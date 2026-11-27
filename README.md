@@ -65,7 +65,24 @@ Cada vez que cambies algo: `git add .` → `git commit -m "qué cambié"` → `g
 - Usa las voces de tu dispositivo, es gratis y no gasta cuota. En ⚙️ Ajustes → *Lectura en voz alta* eliges la voz. En Edge y en Android suele haber voces "naturales" que suenan mejor.
 - Código: `docs/js/voz.js` (Web Speech API, `speechSynthesis`).
 
-### A.4 Probar código ▶️
+### A.4 PDFs escaneados, diapositivas y libros muy visuales 📷
+
+En **Traducir página** eliges cómo se lee cada libro (se recuerda por libro):
+
+| Modo | Qué hace | Cuándo usarlo |
+|---|---|---|
+| **Auto** (por defecto) | Usa el texto del PDF; si sale vacío, ilegible o desordenado, manda la página como imagen | Casi siempre |
+| **Texto** | Solo el texto del PDF | Libros normales, lo más rápido |
+| **Mixto** | Texto + imagen | Páginas con diagramas que quieres que te explique |
+| **Imagen** | Gemini **lee la página mirándola** y la traduce | Escaneos, diapositivas exportadas como imagen, libros tipo *Head First* |
+
+- En modo Imagen, Gemini también guarda lo que leyó en inglés. Así **Preguntar**, **Original en inglés** y el glosario funcionan en esas páginas.
+- La primera vez que abres un libro, la app revisa unas páginas de muestra y te avisa si conviene usar Imagen en todo el libro.
+- En páginas leídas como imagen no puedes seleccionar texto en el PDF (no hay texto); usa **Preguntar**.
+- Gasta una petición por página, igual que antes. Solo tarda un poco más.
+- Código: `evaluarTexto()` en `docs/js/lector.js` decide si el texto sirve, y `leerPaginaComoImagen()` en `docs/js/gemini.js` hace la lectura.
+
+### A.4b Probar código ▶️
 
 - Cada bloque de código (en traducciones, asistente y chat) tiene **▶ Probar**. Se abre el *laboratorio*: editas a la izquierda y ves el resultado a la derecha.
 - **HTML/CSS/JS** corre en un `<iframe sandbox>` sin acceso a tu app ni a tus datos (no puede leer tu clave). `console.log` y los errores aparecen en la consola de abajo, con número de línea.
@@ -118,7 +135,7 @@ docs/
 ├── app.js                interfaz y comportamiento
 ├── js/
 │   ├── util.js           funciones pequeñas que usan todos los módulos
-│   ├── lector.js         extracción de texto del PDF (traducción de lector.py a JavaScript)
+│   ├── lector.js         extracción de texto del PDF + evaluarTexto() (¿texto o imagen?)
 │   ├── gemini.js         llamadas a Gemini con fetch() (reemplaza a traductor.py)
 │   ├── almacen.js        base de datos del navegador, IndexedDB (reemplaza a db.py + SQLite)
 │   ├── voz.js            lectura en voz alta con las voces del dispositivo

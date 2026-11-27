@@ -72,7 +72,7 @@ export function elegirModelos(nombres) {
  *  - opciones.extra: texto que se agrega a las instrucciones (ej. el texto de la página)
  *  - opciones.json:  true para pedir la respuesta en JSON (cuestionarios)
  *  Devuelve { texto, modelo }. */
-async function generar(nombrePrompt, contenidos, { extra = "", json = false } = {}) {
+async function generar(nombrePrompt, contenidos, { extra = "", json = false, temperatura } = {}) {
   const clave = await obtenerClave();
   if (!clave) throw new ErrorGemini("Falta tu clave de Gemini. Ve a ⚙️ Ajustes → Gemini.");
   const modelos = await obtenerModelos();
@@ -81,7 +81,7 @@ async function generar(nombrePrompt, contenidos, { extra = "", json = false } = 
   const cuerpo = {
     systemInstruction: { parts: [{ text: (await leerPrompt(nombrePrompt)) + (extra ? `\n\n${extra}` : "") }] },
     contents: contenidos,
-    generationConfig: { temperature: json ? 0.4 : 0.2, ...(json ? { responseMimeType: "application/json" } : {}) },
+    generationConfig: { temperature: temperatura ?? (json ? 0.4 : 0.2), ...(json ? { responseMimeType: "application/json" } : {}) },
   };
 
   let ultimoError = "";
@@ -115,12 +115,35 @@ async function generar(nombrePrompt, contenidos, { extra = "", json = false } = 
 
 const turnoUsuario = (partes) => [{ role: "user", parts: partes }];
 
-/** Traduce una página. imagenBase64 = PNG de la página (opcional). */
-export function traducirPagina(texto, imagenBase64) {
+/** Traduce una página a partir de su texto. Con imagen = { mime, datos } Gemini
+ *  también ve la página (modo "Texto + imagen"): útil para explicar figuras. */
+export function traducirPagina(texto, imagen = null) {
   const partes = [];
-  if (imagenBase64) partes.push({ inlineData: { mimeType: "image/png", data: imagenBase64 } });
+  if (imagen) partes.push({ inlineData: { mimeType: imagen.mime, data: imagen.datos } });
   partes.push({ text: texto ? `Texto extraído de la página:\n\n${texto}` : "Traduce el contenido de esta página (es una imagen)." });
   return generar("traducir_pagina.md", turnoUsuario(partes));
+}
+
+/** Modo "Imagen": Gemini LEE la página mirándola (como un OCR inteligente) y la traduce.
+ *  Sirve para PDFs escaneados, diapositivas exportadas como imagen y libros muy visuales.
+ *  Pedimos JSON con dos campos para guardar también el texto original en inglés:
+ *  así funcionan "Preguntar", "Original en inglés" y el glosario en esas páginas.
+ *  Devuelve { texto (traducción), original, modelo }. */
+export async function leerPaginaComoImagen(imagen) {
+  const r = await generar(
+    "leer_imagen.md",
+    turnoUsuario([
+      { inlineData: { mimeType: imagen.mime, data: imagen.datos } },
+      { text: "Lee esta página de libro y tradúcela siguiendo las reglas." },
+    ]),
+    { json: true, temperatura: 0.2 }
+  );
+  let datos;
+  try { datos = JSON.parse(r.texto); }
+  catch { return { texto: r.texto, original: "", modelo: r.modelo }; } // vino Markdown suelto: lo usamos igual
+  const traduccion = String(datos.traduccion || "").trim();
+  if (!traduccion) throw new ErrorGemini("Gemini no encontró texto en la imagen. Prueba «Volver a traducir».");
+  return { texto: traduccion, original: String(datos.original || "").trim(), modelo: r.modelo };
 }
 
 const PROMPTS_ASISTENTE = {

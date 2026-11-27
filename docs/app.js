@@ -115,8 +115,7 @@ function aplicarAjustes() {
   for (const b of $("fuente").children) b.classList.toggle("activo", b.dataset.valor === ajustes.fuente);
   $("rep-velocidad").value = String(ajustes.velocidadVoz);
   $("rep-seguir").checked = ajustes.seguirLeyendo;
-  $("modo-texto").setAttribute("aria-checked", String(!ajustes.conImagen));
-  $("modo-imagen").setAttribute("aria-checked", String(ajustes.conImagen));
+  pintarModo();
   if (estado.info) mostrarAviso(estado.info);
 }
 
@@ -239,7 +238,37 @@ async function abrirLibro(id) {
   $("total").textContent = $("pie-total").textContent = estado.total;
   $("numero").max = $("deslizador").max = estado.total;
   lector.leerIndice(estado.pdf).then((i) => { estado.indice = i; actualizarProgreso(); }).catch(() => {});
+  pintarModo();
   await irA(libro.ultimaPagina || 1, { forzar: true });
+  if (!libro.revisado) revisarLibro(libro);
+}
+
+/** La primera vez que abres un libro, miramos unas páginas de muestra.
+ *  Si casi todas salen escaneadas o "visuales", te sugerimos el modo Imagen para todo el libro. */
+async function revisarLibro(libro) {
+  try {
+    const total = estado.total;
+    if (total < 8) return;
+    const muestras = [...new Set([0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map((f) => Math.max(1, Math.round(total * f))))];
+    let malas = 0;
+    for (const n of muestras) {
+      if (libro !== estado.libro) return;            // cambiaste de libro mientras revisábamos
+      if ((await extraer(n)).calidad !== "buena") malas++;
+    }
+    libro.revisado = true;
+    await almacen.libros.guardar(libro);
+    if (malas / muestras.length < 0.6 || libro.modo) return;
+    const escaneado = (await Promise.all(muestras.map(extraer))).filter((d) => d.calidad === "vacia" || d.calidad === "pobre").length > muestras.length / 2;
+    const aviso = avisar(escaneado
+      ? "📷 Este libro parece escaneado (sus páginas son imágenes). En modo Auto, Gemini las leerá como imagen."
+      : "📷 Este libro es muy visual (globos, notas, flechas). Gemini lo entiende mejor mirando la página.",
+      "info con-accion", 15000);
+    const b = document.createElement("button");
+    b.className = "boton-chico";
+    b.textContent = "Usar «Imagen» siempre";
+    b.onclick = () => { aviso.remove(); cambiarModo("imagen"); avisar("Listo: en este libro Gemini leerá cada página como imagen.", "exito"); };
+    aviso.append(b);
+  } catch { /* la revisión es solo una ayuda */ }
 }
 
 /** Agrega un PDF a este dispositivo (o completa uno que vino en un respaldo). */
@@ -380,9 +409,10 @@ async function cargarInfo(numero) {
       traducidas,
       traduccion: guardada?.texto || null,
       modelo: guardada?.modelo || null,
+      original: guardada?.original || "",
       ...datos,
     };
-    $("texto-extraido").textContent = datos.texto || "(sin texto: página escaneada o en blanco)";
+    pintarTextoExtraido();
     if (!$("panel-preguntar").hidden) chat.pintar();
     mostrarTraduccionPagina();
     actualizarProgreso();
@@ -424,12 +454,74 @@ function pintarIndice() {
 }
 
 // ───────────── 6. Traducir página completa ─────────────
+// Modos de lectura de una página (se guardan POR LIBRO):
+//  auto   → texto del PDF; si sale ilegible o desordenado, la página va como imagen.
+//  texto  → siempre el texto del PDF (lo más barato).
+//  mixto  → texto + imagen (Gemini explica las figuras).
+//  imagen → Gemini lee la página mirándola (escaneos, diapositivas, Head First).
+const MODOS = ["auto", "texto", "mixto", "imagen"];
+
+function modoDelLibro() {
+  const m = estado.libro?.modo;
+  if (MODOS.includes(m)) return m;
+  return ajustes.conImagen ? "mixto" : "auto"; // compatibilidad con el ajuste viejo
+}
+
+/** Qué se hará realmente con ESTA página según el modo y la calidad de su texto. */
+function modoEfectivo(info) {
+  const modo = modoDelLibro();
+  if (modo === "imagen") return "imagen";
+  if (info.calidad === "vacia") return "imagen";        // sin texto no hay alternativa
+  if (modo === "auto" && info.calidad !== "buena") return "imagen";
+  return modo === "mixto" ? "mixto" : "texto";
+}
+
+function pintarModo() {
+  const modo = modoDelLibro();
+  for (const b of $("modo-lectura").children) b.setAttribute("aria-checked", String(b.dataset.modo === modo));
+}
+
+async function cambiarModo(modo) {
+  if (!estado.libro || !MODOS.includes(modo)) return;
+  estado.libro.modo = modo;
+  estado.libro.actualizado = new Date().toISOString(); // para que se sincronice
+  await almacen.libros.guardar(estado.libro);
+  pintarModo();
+  if (estado.info) { mostrarAviso(estado.info); pintarTextoExtraido(); }
+}
+
 function mostrarAviso(info) {
+  const efectivo = modoEfectivo(info);
+  const modo = modoDelLibro();
   let texto = "";
-  if (!info.tieneTexto) texto = "📷 Esta página no tiene texto seleccionable (escaneada o figura): se enviará como imagen.";
-  else if (info.tieneImagenes && !ajustes.conImagen) texto = "🖼️ Esta página tiene figuras. Elige «Texto + imagen» para que Gemini también las explique.";
+  if (efectivo === "imagen" && modo !== "imagen") {
+    texto = `📷 ${info.motivo}: Gemini la leerá como imagen (gasta lo mismo, tarda un poco más).`;
+  } else if (efectivo === "texto" && info.calidad !== "buena") {
+    texto = `⚠️ ${info.motivo}. Si la traducción sale rara, elige «Imagen».`;
+  } else if (efectivo === "texto" && info.tieneImagenes) {
+    texto = "🖼️ Esta página tiene figuras. Elige «Mixto» para que Gemini también las explique.";
+  }
   $("aviso").textContent = texto;
   $("aviso").hidden = !texto;
+}
+
+/** Panel "Texto extraído": muestra lo que de verdad se usa como texto de la página. */
+function pintarTextoExtraido() {
+  const info = estado.info;
+  if (!info) return;
+  const usarOriginal = info.original && modoEfectivo(info) === "imagen";
+  $("texto-extraido").textContent = usarOriginal
+    ? `(leído por Gemini desde la imagen)\n\n${info.original}`
+    : info.texto || "(sin texto: página escaneada o en blanco. Tradúcela y Gemini la leerá como imagen)";
+}
+
+/** El mejor texto en inglés que tenemos de una página: el del PDF si es bueno,
+ *  o el que Gemini leyó de la imagen. Lo usan "Preguntar" y "Original en inglés". */
+async function textoDeLaPagina(numero) {
+  const datos = await extraer(numero);
+  if (datos.calidad === "buena" && modoDelLibro() !== "imagen") return datos.texto;
+  const guardada = estado.libro ? await almacen.traducciones.obtener(estado.libro.id, numero) : null;
+  return guardada?.original || datos.texto;
 }
 
 function mostrarTraduccionPagina() {
@@ -459,15 +551,22 @@ function mostrarTraduccionPagina() {
   }
 }
 
-/** Dibuja la página en un canvas aparte y la devuelve como PNG en base64. */
+/** Dibuja la página en un canvas aparte y la devuelve como JPEG en base64.
+ *  ~1600 px de ancho: suficiente para leer letra chica, y JPEG pesa 5-10 veces menos que PNG. */
 async function imagenDePagina(numero) {
   const pagina = await estado.pdf.getPage(numero);
-  const viewport = pagina.getViewport({ scale: 1.6 });
+  const base = pagina.getViewport({ scale: 1 });
+  const viewport = pagina.getViewport({ scale: Math.min(2.5, 1600 / base.width) });
   const lienzo = document.createElement("canvas");
   lienzo.width = Math.floor(viewport.width);
   lienzo.height = Math.floor(viewport.height);
-  await pagina.render({ canvasContext: lienzo.getContext("2d"), viewport }).promise;
-  return lienzo.toDataURL("image/png").split(",")[1];
+  const ctx = lienzo.getContext("2d");
+  ctx.fillStyle = "#fff";                       // JPEG no tiene transparencia: fondo blanco
+  ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  await pagina.render({ canvasContext: ctx, viewport }).promise;
+  const datos = lienzo.toDataURL("image/jpeg", 0.85).split(",")[1];
+  lienzo.width = lienzo.height = 0;              // libera memoria (importante en el celular)
+  return { mime: "image/jpeg", datos };
 }
 
 async function traducirPagina() {
@@ -481,16 +580,18 @@ async function traducirPagina() {
   mostrarTraduccionPagina();
   try {
     const datos = await extraer(numero);
-    const conImagen = ajustes.conImagen || !datos.tieneTexto;
-    const png = conImagen ? await imagenDePagina(numero) : null;
-    const r = await gemini.traducirPagina(datos.tieneTexto ? datos.texto : null, png);
-    await almacen.traducciones.guardar(libro.id, numero, r.texto, r.modelo);
+    const modo = modoEfectivo(datos);
+    let r;
+    if (modo === "imagen") r = await gemini.leerPaginaComoImagen(await imagenDePagina(numero));
+    else r = await gemini.traducirPagina(datos.texto, modo === "mixto" ? await imagenDePagina(numero) : null);
+    await almacen.traducciones.guardar(libro.id, numero, r.texto, r.modelo, r.original ? { original: r.original, modo } : { modo });
     estudio.agregarVocabularioDe(r.texto, libro.id, numero).then((n) => {
       if (n) avisar(`📌 ${n} término${n > 1 ? "s" : ""} nuevo${n > 1 ? "s" : ""} en tu glosario`, "exito", 3000);
     });
     if (libro === estado.libro && numero === estado.pagina) {
-      Object.assign(estado.info, { traduccion: r.texto, modelo: r.modelo, traducidas: await almacen.traducciones.contar(libro.id) });
+      Object.assign(estado.info, { traduccion: r.texto, modelo: r.modelo, original: r.original || "", traducidas: await almacen.traducciones.contar(libro.id) });
       actualizarProgreso();
+      pintarTextoExtraido();
     } else {
       avisar(`Página ${numero} traducida ✔`, "exito");
     }
@@ -893,10 +994,10 @@ async function esperarTraduccion() {
 /** Escucha el texto ORIGINAL en inglés (para practicar pronunciación). */
 async function escucharIngles() {
   if (!voz.disponible) { avisarSinVoz(); return; }
-  const datos = await extraer(estado.pagina);
-  if (!datos.tieneTexto) { avisar("Esta página no tiene texto para leer.", "info"); return; }
+  const textoIngles = await textoDeLaPagina(estado.pagina);
+  if (textoIngles.replace(/\s+/g, "").length < 20) { avisar("Esta página no tiene texto. Tradúcela primero: Gemini la leerá como imagen.", "info", 5000); return; }
   const temporal = document.createElement("div");
-  temporal.innerHTML = markdownAHtml(datos.texto.replace(/\[\/?(RECUADRO|FIGURA)\]/g, ""));
+  temporal.innerHTML = markdownAHtml(textoIngles.replace(/\[\/?(RECUADRO|FIGURA)\]/g, ""));
   const bloques = voz.bloquesDe(temporal);
   contextoVoz = { tipo: "ingles", pagina: estado.pagina };
   $("rep-titulo").textContent = `Página ${estado.pagina} · original en inglés`;
@@ -971,7 +1072,7 @@ chat.iniciarChat({
   libroId: () => estado.libro?.id || null,
   tituloLibro: () => estado.libro?.titulo || estado.libro?.nombre || "",
   pagina: () => estado.pagina,
-  textoPagina: async () => (estado.pdf ? (await extraer(estado.pagina)).texto : ""),
+  textoPagina: async () => (estado.pdf ? textoDeLaPagina(estado.pagina) : ""),
   fragmento: () => estado.fragmento?.texto || "",
   escuchar: (el, titulo) => escucharElemento(el, titulo),
   guardarNota: guardarNotaLibre,
@@ -1244,8 +1345,7 @@ $("btn-pantalla").onclick = () => document.fullscreenElement ? document.exitFull
 $("btn-indice").onclick = (e) => { e.stopPropagation(); const m = $("menu-indice"); m.hidden = !m.hidden; if (!m.hidden) pintarIndice(); };
 
 $("btn-traducir").onclick = traducirPagina;
-$("modo-texto").onclick = () => cambiarAjuste("conImagen", false);
-$("modo-imagen").onclick = () => cambiarAjuste("conImagen", true);
+$("modo-lectura").onclick = (e) => { const b = e.target.closest("[data-modo]"); if (b) cambiarModo(b.dataset.modo); };
 $("letra-menos").onclick = () => cambiarLetra(-1);
 $("letra-mas").onclick = () => cambiarLetra(+1);
 

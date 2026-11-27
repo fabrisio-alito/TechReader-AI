@@ -226,6 +226,11 @@ export async function extraerPagina(pagina, pdfjsLib) {
     return !(enMargen && b.caracteres < 80);
   });
 
+  // Para detectar páginas "collage" (Head First): muchos bloques chiquitos sueltos.
+  const totalCar = bloques.reduce((s, b) => s + b.caracteres, 0);
+  const chicos = bloques.filter((b) => b.caracteres < 40);
+  const sueltos = { cantidad: chicos.length, proporcion: totalCar ? chicos.reduce((s, b) => s + b.caracteres, 0) / totalCar : 0 };
+
   let texto = "";
   if (bloques.length) {
     const cuerpo = tamanoCuerpo(bloques);
@@ -262,7 +267,46 @@ export async function extraerPagina(pagina, pdfjsLib) {
   } catch { /* no es grave */ }
 
   texto = texto.trim();
-  return { texto, tieneTexto: texto.length > 20, tieneImagenes };
+  return { texto, tieneTexto: texto.length > 20, tieneImagenes, sueltos, ...evaluarTexto(texto, tieneImagenes, sueltos) };
+}
+
+/** ¿El texto extraído sirve para traducir, o conviene que Gemini "vea" la página?
+ *  Devuelve { calidad, motivo }:
+ *   - "buena":  texto normal de libro → se traduce el texto (rápido y barato).
+ *   - "vacia":  no hay texto (página escaneada o solo figura).
+ *   - "pobre":  hay "texto" pero es basura (escaneo con OCR malo, fuentes raras).
+ *   - "visual": texto real pero repartido en globos, flechas y notas (estilo Head First),
+ *               o la página es casi toda una figura. Leído en orden interno sale desordenado.
+ *  Son reglas simples (heurísticas): no aciertan siempre, por eso el usuario puede
+ *  elegir el modo a mano. */
+export function evaluarTexto(texto, tieneImagenes = false, sueltos = null) {
+  // El código tiene líneas cortas y símbolos raros a propósito: no lo contamos.
+  const prosa = texto.replace(/```[\s\S]*?```/g, " ").replace(/\[\/?(RECUADRO|FIGURA)\]/g, " ");
+  const letras = texto.replace(/\s+/g, "").length;
+  if (letras < 20) return { calidad: "vacia", motivo: "Esta página no tiene texto seleccionable" };
+
+  // 1) ¿Son palabras de verdad? Un OCR malo produce cosas como "tlie", "rn", "lll|".
+  const palabras = prosa.match(/[A-Za-zÀ-ÿ]+/g) || [];
+  const reales = palabras.filter((p) => p.length >= 2 && p.length <= 20 && /[aeiouy]/i.test(p));
+  const proporcionReales = palabras.length ? reales.length / palabras.length : 0;
+  // 2) ¿Hay muchos caracteres extraños? (fuentes con codificación propia)
+  const raros = (prosa.match(/[^\x20-\x7E\s\u00A0-\u00FF\u2010-\u203A]/g) || []).length;
+  if (palabras.length < 8 || proporcionReales < 0.55 || raros / Math.max(1, prosa.length) > 0.1) {
+    return { calidad: "pobre", motivo: "El texto de esta página sale ilegible" };
+  }
+  // 3) ¿Está todo en pedacitos? Globos y notas sueltas por toda la página.
+  //    (Medido en "Learning Web Design": sus páginas nunca pasan de 0.42.)
+  if (sueltos && sueltos.cantidad >= 8 && sueltos.proporcion >= 0.5) {
+    return { calidad: "visual", motivo: "Esta página es muy visual (globos, flechas, notas sueltas)" };
+  }
+  //    Otra señal: muchas líneas de 1-3 palabras.
+  const lineas = prosa.split("\n").map((l) => l.replace(/^[-*>#\s]+/, "").trim()).filter(Boolean);
+  const cortas = lineas.filter((l) => l.split(/\s+/).length <= 3).length;
+  if (lineas.length >= 12 && cortas / lineas.length > 0.55) {
+    return { calidad: "visual", motivo: "Esta página es muy visual (globos, flechas, notas sueltas)" };
+  }
+  if (tieneImagenes && letras < 250) return { calidad: "visual", motivo: "Esta página es casi toda una figura" };
+  return { calidad: "buena", motivo: "" };
 }
 
 /** Texto plano de todas las páginas, en minúsculas, para la búsqueda.

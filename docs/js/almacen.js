@@ -113,8 +113,9 @@ export const libros = {
 // ───────────── Traducciones de página ─────────────
 export const traducciones = {
   obtener: (libroId, pagina) => operar("traducciones", "readonly", (t) => t.get([libroId, pagina])),
-  guardar: (libroId, pagina, texto, modelo) =>
-    operar("traducciones", "readwrite", (t) => t.put({ libroId, pagina, texto, modelo, fecha: ahora() })),
+  /** extra = { original, modo }: en el modo "Imagen" guardamos también lo que Gemini leyó en inglés. */
+  guardar: (libroId, pagina, texto, modelo, extra = {}) =>
+    operar("traducciones", "readwrite", (t) => t.put({ libroId, pagina, texto, modelo, ...extra, fecha: ahora() })),
   contar: (libroId) => operar("traducciones", "readonly", (t) => t.index("libroId").count(libroId)),
   deLibro: (libroId) => operar("traducciones", "readonly", (t) => t.index("libroId").getAll(libroId)),
   todas: () => operar("traducciones", "readonly", (t) => t.getAll()),
@@ -254,7 +255,7 @@ export async function fusionar(datos) {
       const local = await libros.obtener(l.id);
       if (!local) { await libros.guardar({ ...l, archivo: null }); r.libros++; }
       else if (masNuevo(l.actualizado, local.actualizado)) {
-        await libros.guardar({ ...local, ultimaPagina: l.ultimaPagina, actualizado: l.actualizado, titulo: local.titulo || l.titulo });
+        await libros.guardar({ ...local, ultimaPagina: l.ultimaPagina, modo: l.modo ?? local.modo, actualizado: l.actualizado, titulo: local.titulo || l.titulo });
         r.libros++;
       }
     }

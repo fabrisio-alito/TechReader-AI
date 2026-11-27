@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="iconos/icono-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="stylesheet" href="estilos.css?v=3">
+  <link rel="stylesheet" href="estilos.css?v=4">
 </head>
 <body>
 
@@ -221,9 +221,11 @@
 
         <div id="panel-pagina" class="panel-contenido" hidden>
           <div class="acciones-pagina">
-            <div class="segmentado" role="radiogroup" aria-label="Modo de traducción">
-              <button id="modo-texto" role="radio" aria-checked="true" title="Más rápido y gasta menos cuota">Solo texto</button>
-              <button id="modo-imagen" role="radio" aria-checked="false" title="Gemini ve la página: ideal con diagramas">Texto + imagen</button>
+            <div id="modo-lectura" class="segmentado" role="radiogroup" aria-label="Cómo leer la página">
+              <button data-modo="auto" role="radio" aria-checked="true" title="Usa el texto del PDF; si sale ilegible o desordenado, envía la página como imagen">Auto</button>
+              <button data-modo="texto" role="radio" aria-checked="false" title="Solo el texto del PDF: más rápido y gasta menos cuota">Texto</button>
+              <button data-modo="mixto" role="radio" aria-checked="false" title="Texto + imagen: Gemini también ve las figuras para explicarlas">Mixto</button>
+              <button data-modo="imagen" role="radio" aria-checked="false" title="Gemini lee la página mirándola: para escaneos, diapositivas y libros muy visuales (Head First)">Imagen</button>
             </div>
             <button id="btn-traducir" class="boton-primario"><svg><use href="#i-traducir"/></svg><span>Traducir página</span></button>
           </div>
@@ -612,6 +614,6 @@
   }
   setTimeout(function () { mostrarErrorCarga(); }, 10000);
 </script>
-<script type="module" src="app.js?v=3" onerror="mostrarErrorCarga('No se pudo descargar app.js')"></script>
+<script type="module" src="app.js?v=4" onerror="mostrarErrorCarga('No se pudo descargar app.js')"></script>
 </body>
 </html>
