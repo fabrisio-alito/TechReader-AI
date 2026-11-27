@@ -23,6 +23,7 @@ import hljs from "./vendor/highlight.min.js?v=1";
 import * as almacen from "./js/almacen.js";
 import * as gemini from "./js/gemini.js";
 import * as lector from "./js/lector.js";
+import * as voz from "./js/voz.js";
 
 window.appLista = true;
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.js?v=1";
@@ -100,6 +101,7 @@ const AJUSTES_INICIALES = {
   tema: "oscuro", letra: 18, interlineado: 1.65, fuente: "sans",
   pdfOscuro: false, auto: false, conImagen: false, split: 52, zoom: 1,
   nombre: "Fabrisio", ultimoLibro: null,
+  vozEs: null, vozEn: null, velocidadVoz: 1, seguirLeyendo: false,
 };
 function cargarAjustes() {
   try { return { ...AJUSTES_INICIALES, ...JSON.parse(localStorage.getItem("techreader-web") || "{}") }; }
@@ -131,6 +133,8 @@ function aplicarAjustes() {
   $("zoom-valor").textContent = `${Math.round(ajustes.zoom * 100)}%`;
   for (const b of $("tema").children) b.classList.toggle("activo", b.dataset.valor === ajustes.tema);
   for (const b of $("fuente").children) b.classList.toggle("activo", b.dataset.valor === ajustes.fuente);
+  $("rep-velocidad").value = String(ajustes.velocidadVoz);
+  $("rep-seguir").checked = ajustes.seguirLeyendo;
   $("modo-texto").setAttribute("aria-checked", String(!ajustes.conImagen));
   $("modo-imagen").setAttribute("aria-checked", String(ajustes.conImagen));
   if (estado.info) mostrarAviso(estado.info);
@@ -218,6 +222,7 @@ async function abrirLibro(id) {
   if (!libro) return;
   // Cerramos el libro anterior (en PDF.js v6 se cierra con la "tarea de carga").
   if (estado.tareaPdf) { await estado.tareaPdf.destroy().catch(() => {}); estado.tareaPdf = null; estado.pdf = null; }
+  lectorVoz.detener();
   Object.assign(estado, { libro, rotacion: 0, fragmento: null, indice: [], textosBusqueda: null, extraidas: new Map(), info: null });
   ajustes.ultimoLibro = id;
   guardarAjustes();
@@ -300,10 +305,11 @@ async function quitarLibro(libro) {
 }
 
 // ───────────── 5. Páginas ─────────────
-async function irA(numero, { forzar = false } = {}) {
+async function irA(numero, { forzar = false, desdeLectura = false } = {}) {
   if (!estado.pdf) return;
   numero = limitar(Math.round(Number(numero) || 1), 1, estado.total);
   if (numero === estado.pagina && !forzar) return;
+  if (!desdeLectura && lectorVoz.estado !== "detenido" && contextoVoz?.tipo !== "tarjeta") lectorVoz.detener();
   estado.pagina = numero;
   $("numero").value = numero;
   $("deslizador").value = numero;
@@ -633,6 +639,14 @@ function pintarAsistente() {
       tarjeta.querySelector("header").append(reintentar);
     } else {
       pintarMarkdown(cuerpo, res.md);
+      if (voz.disponible) {
+        const escuchar = document.createElement("button");
+        escuchar.className = "boton-chico voz";
+        escuchar.title = "Escuchar";
+        escuchar.innerHTML = icono("altavoz");
+        escuchar.onclick = () => escucharElemento(cuerpo, def.titulo);
+        tarjeta.querySelector("header").append(escuchar);
+      }
       const copiar = document.createElement("button");
       copiar.className = "boton-chico";
       copiar.innerHTML = `${icono("copiar")}${def.copiar}`;
@@ -799,6 +813,146 @@ $("busqueda").addEventListener("keydown", (e) => {
 });
 $("btn-buscar-movil").onclick = () => { $("buscador").classList.add("abierto"); $("busqueda").focus(); };
 
+// ───────────── 9b. Lectura en voz alta ─────────────
+let contextoVoz = null;     // { tipo: "pagina" | "ingles" | "tarjeta", pagina, titulo }
+let bloqueResaltado = null;
+let bloqueoPantalla = null; // "wake lock": evita que el celular apague la pantalla
+
+const lectorVoz = new voz.Lector({
+  alCambiar(indice, total) {
+    bloqueResaltado?.classList.remove("leyendo");
+    const bloque = lectorVoz.bloques[indice];
+    if (bloque?.elemento?.isConnected) {
+      bloqueResaltado = bloque.elemento;
+      bloqueResaltado.classList.add("leyendo");
+      bloqueResaltado.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    $("rep-avance").textContent = `Párrafo ${indice + 1} de ${total}`;
+  },
+  alEstado(e) {
+    $("reproductor").hidden = e === "detenido";
+    $("rep-play").innerHTML = icono(e === "leyendo" ? "pausa" : "play");
+    if (e === "leyendo") mantenerPantalla(true);
+    else mantenerPantalla(false);
+  },
+  alTerminar(completo) {
+    bloqueResaltado?.classList.remove("leyendo");
+    bloqueResaltado = null;
+    if (completo && contextoVoz?.tipo !== "tarjeta" && ajustes.seguirLeyendo) seguirConLaSiguiente();
+  },
+});
+
+async function mantenerPantalla(activar) {
+  try {
+    if (activar && !bloqueoPantalla && navigator.wakeLock) bloqueoPantalla = await navigator.wakeLock.request("screen");
+    if (!activar && bloqueoPantalla) { await bloqueoPantalla.release(); bloqueoPantalla = null; }
+  } catch { /* no todos los navegadores lo permiten */ }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && lectorVoz.estado === "leyendo") { bloqueoPantalla = null; mantenerPantalla(true); }
+});
+
+async function vozElegida(idioma) {
+  const lista = await voz.voces(idioma);
+  return voz.mejorVoz(lista, idioma === "es" ? ajustes.vozEs : ajustes.vozEn);
+}
+
+function avisarSinVoz() {
+  avisar("Tu navegador no tiene lectura en voz alta. Prueba con Chrome, Edge o Safari actualizados.", "error", 6000);
+}
+
+/** Lee en voz alta cualquier contenedor ya dibujado (traducción, tarjeta…). */
+async function escucharElemento(contenedor, titulo, tipo = "tarjeta") {
+  if (!voz.disponible) { avisarSinVoz(); return; }
+  const bloques = voz.bloquesDe(contenedor);
+  if (!bloques.length) { avisar("No hay texto para leer.", "info"); return; }
+  contextoVoz = { tipo, pagina: estado.pagina, titulo };
+  $("rep-titulo").textContent = titulo;
+  lectorVoz.leer(bloques, { voz: await vozElegida("es"), velocidad: ajustes.velocidadVoz, idioma: "es-ES" });
+}
+
+/** Escucha la traducción de la página actual (si no existe, la traduce antes). */
+async function escucharPagina() {
+  if (!voz.disponible) { avisarSinVoz(); return; }
+  if (!estado.info) return;
+  cambiarPestana("pagina");
+  if (esMovil()) cambiarPanelMovil("asistente");
+  if (!estado.info.traduccion) {
+    await traducirPagina();
+    await esperarTraduccion();
+    if (!estado.info?.traduccion) return; // falló la traducción (ya se mostró el error)
+  }
+  await escucharElemento($("traduccion"), `Página ${estado.pagina} · traducción`, "pagina");
+}
+
+/** Espera a que termine una traducción que ya estaba en curso (máx. 90 s). */
+async function esperarTraduccion() {
+  const clave = () => `${estado.libro?.id}|${estado.pagina}`;
+  for (let i = 0; i < 300 && estado.traduciendo.has(clave()); i++) await new Promise((r) => setTimeout(r, 300));
+}
+
+/** Escucha el texto ORIGINAL en inglés (para practicar pronunciación). */
+async function escucharIngles() {
+  if (!voz.disponible) { avisarSinVoz(); return; }
+  const datos = await extraer(estado.pagina);
+  if (!datos.tieneTexto) { avisar("Esta página no tiene texto para leer.", "info"); return; }
+  const temporal = document.createElement("div");
+  temporal.innerHTML = DOMPurify.sanitize(marked.parse(datos.texto.replace(/\[\/?(RECUADRO|FIGURA)\]/g, "")));
+  const bloques = voz.bloquesDe(temporal);
+  contextoVoz = { tipo: "ingles", pagina: estado.pagina };
+  $("rep-titulo").textContent = `Página ${estado.pagina} · original en inglés`;
+  const vozEn = await vozElegida("en");
+  if (!vozEn) avisar("No encontré una voz en inglés en este dispositivo; se usará la voz por defecto.", "info", 5000);
+  lectorVoz.leer(bloques, { voz: vozEn, velocidad: ajustes.velocidadVoz, idioma: "en-US" });
+}
+
+/** Modo audiolibro: al terminar una página, pasa a la siguiente y sigue leyendo. */
+async function seguirConLaSiguiente() {
+  const tipo = contextoVoz?.tipo;
+  if (estado.pagina >= estado.total) { avisar("Llegaste al final del libro 🎉", "exito"); return; }
+  await irA(estado.pagina + 1, { desdeLectura: true });
+  if (tipo === "ingles") escucharIngles();
+  else escucharPagina();
+}
+
+async function llenarVoces() {
+  if (!voz.disponible) return;
+  for (const [idioma, id, clave] of [["es", "ajuste-voz-es", "vozEs"], ["en", "ajuste-voz-en", "vozEn"]]) {
+    const lista = await voz.voces(idioma);
+    const elegida = voz.mejorVoz(lista, ajustes[clave]);
+    $(id).innerHTML = lista.length
+      ? lista.map((v) => `<option value="${escapar(v.voiceURI)}">${escapar(v.name)} (${escapar(v.lang)})</option>`).join("")
+      : '<option value="">(no hay voces en este idioma)</option>';
+    if (elegida) $(id).value = elegida.voiceURI;
+  }
+}
+
+async function probarVoz(idioma) {
+  if (!voz.disponible) { avisarSinVoz(); return; }
+  const v = await vozElegida(idioma);
+  const temporal = document.createElement("p");
+  temporal.textContent = idioma === "es"
+    ? "Hola. Así suena tu libro traducido al español."
+    : "Hello. This is how the original English text sounds.";
+  contextoVoz = { tipo: "tarjeta" };
+  $("rep-titulo").textContent = "Prueba de voz";
+  lectorVoz.leer([{ elemento: null, texto: temporal.textContent }], { voz: v, velocidad: ajustes.velocidadVoz, idioma: idioma === "es" ? "es-ES" : "en-US" });
+}
+
+$("btn-escuchar").onclick = escucharPagina;
+$("btn-escuchar-ingles").onclick = escucharIngles;
+$("rep-play").onclick = () => lectorVoz.alternar();
+$("rep-anterior").onclick = () => lectorVoz.saltar(-1);
+$("rep-siguiente").onclick = () => lectorVoz.saltar(+1);
+$("rep-cerrar").onclick = () => lectorVoz.detener();
+$("rep-velocidad").onchange = (e) => { cambiarAjuste("velocidadVoz", Number(e.target.value)); lectorVoz.cambiarVelocidad(ajustes.velocidadVoz); };
+$("rep-seguir").onchange = (e) => cambiarAjuste("seguirLeyendo", e.target.checked);
+$("ajuste-voz-es").onchange = (e) => cambiarAjuste("vozEs", e.target.value);
+$("ajuste-voz-en").onchange = (e) => cambiarAjuste("vozEn", e.target.value);
+$("probar-voz-es").onclick = () => probarVoz("es");
+$("probar-voz-en").onclick = () => probarVoz("en");
+if (!voz.disponible) document.querySelectorAll(".acciones-voz").forEach((e) => e.hidden = true);
+
 // ───────────── 10. Ajustes: clave, PIN, respaldo ─────────────
 async function abrirAjustes(mostrar = true) {
   $("ajustes").hidden = !mostrar;
@@ -809,6 +963,7 @@ async function abrirAjustes(mostrar = true) {
   $("estado-clave").textContent = clave ? "✔ configurada" : "⚠️ falta";
   $("ajuste-modelos").value = (await gemini.obtenerModelos()).join(", ");
   $("estado-pin").textContent = (await almacen.config.obtener("pin")) ? "✔ activado" : "desactivado";
+  llenarVoces();
   const esp = await almacen.espacio();
   $("espacio-usado").textContent = esp ? `Usas ${esp.usadoMB} MB de ${esp.totalMB} MB disponibles.` : "";
 }
@@ -1071,6 +1226,7 @@ document.addEventListener("keydown", (e) => {
     case "ArrowRight": case "PageDown": irA(estado.pagina + 1); break;
     case "t": case "T": haySeleccion ? accionDesdeSeleccion("traducir") : traducirPagina(); break;
     case "e": case "E": if (haySeleccion) accionDesdeSeleccion("explicar"); else return; break;
+    case "l": case "L": lectorVoz.estado === "detenido" ? escucharPagina() : lectorVoz.alternar(); break;
     case "+": case "=": cambiarLetra(+1); break;
     case "-": cambiarLetra(-1); break;
     default: return;

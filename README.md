@@ -56,7 +56,16 @@ Cada vez que cambies algo: `git add .` → `git commit -m "qué cambié"` → `g
    - PC (Chrome/Edge): ícono de instalar en la barra de direcciones, o el botón 📱 de la app.
 4. **En la PC del trabajo:** activa un **PIN** en ⚙️ Ajustes → Seguridad. Al terminar tu uso ahí, usa **Salir de este dispositivo** si no quieres dejar nada guardado.
 
-### A.3 Respaldo: pasar tu avance de un dispositivo a otro
+### A.3 Lectura en voz alta 🔊
+
+- En **Traducir página**: **Escuchar traducción** (atajo `L`) u **Original en inglés** para practicar pronunciación.
+- En cada tarjeta del Asistente IA, el botón 🔊 lee esa tarjeta.
+- El reproductor permite pausar, ir al párrafo anterior o siguiente y cambiar la velocidad (0.75× a 2×). El párrafo que se está leyendo se resalta.
+- **Seguir** (modo audiolibro): al terminar una página pasa a la siguiente, la traduce si hace falta y sigue leyendo. Ojo: cada página nueva gasta una petición de Gemini.
+- Usa las voces de tu dispositivo, es gratis y no gasta cuota. En ⚙️ Ajustes → *Lectura en voz alta* eliges la voz. En Edge y en Android suele haber voces "naturales" que suenan mejor.
+- Código: `docs/js/voz.js` (Web Speech API, `speechSynthesis`).
+
+### A.4 Respaldo: pasar tu avance de un dispositivo a otro
 
 - ⚙️ **Ajustes → Tus datos → Descargar respaldo** genera un archivo `.json` con tu progreso, traducciones y notas (sin los PDF).
 - Marca **"Incluir mi clave de Gemini"** para que el respaldo la lleve **cifrada** con una contraseña tuya.
@@ -65,7 +74,7 @@ Cada vez que cambies algo: `git add .` → `git commit -m "qué cambié"` → `g
 
 ⚠️ Tus datos viven en el navegador. **No borres "Cookies y datos de sitios"** del navegador o los perderás. Descarga un respaldo de vez en cuando.
 
-### A.4 Cómo está hecha (para aprender)
+### A.5 Cómo está hecha (para aprender)
 
 ```
 docs/
@@ -75,7 +84,8 @@ docs/
 ├── js/
 │   ├── lector.js         extracción de texto del PDF (traducción de lector.py a JavaScript)
 │   ├── gemini.js         llamadas a Gemini con fetch() (reemplaza a traductor.py)
-│   └── almacen.js        base de datos del navegador, IndexedDB (reemplaza a db.py + SQLite)
+│   ├── almacen.js        base de datos del navegador, IndexedDB (reemplaza a db.py + SQLite)
+│   └── voz.js            lectura en voz alta con las voces del dispositivo
 ├── prompts/*.md          las mismas instrucciones para la IA
 ├── manifest.webmanifest  permite "instalarla" como app
 ├── sw.js                 service worker: abre sin internet (estrategia "red primero")
